@@ -8,9 +8,15 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        display: ["var(--font-bebas)", "'Bebas Neue'", "sans-serif"],
+      },
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        brand: {
+          green: "#3d5540",
+          sage: "#c8d8ca",
+          light: "#f8f9f8",
+        },
       },
     },
   },
