@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { collection, doc, writeBatch } from "firebase/firestore/lite";
+import { adminDb } from "@/lib/firebaseAdmin";
 import { fetchAllActiveVariants, fetchInventoryLevels, toLocationGid } from "@/lib/shopify";
 import type { ShopifyProduct } from "@/lib/types";
 
@@ -26,7 +25,6 @@ export async function POST() {
     const storeMap = new Map<string, { onHandQty: number; unitCost: number | null }>();
     const warehouseMap = new Map<string, number>();
 
-    // Build all chunks, then fetch all in parallel (up to 6 at a time to avoid rate limits)
     const chunks: string[][] = [];
     for (let i = 0; i < inventoryItemIds.length; i += CHUNK) {
       chunks.push(inventoryItemIds.slice(i, i + CHUNK));
@@ -51,9 +49,9 @@ export async function POST() {
       );
     }
 
-    // Write in batches of 500 (Firestore limit)
-    const col = collection(db, "shopifyProducts");
-    let batch = writeBatch(db);
+    // Write in batches of 499 (Firestore batch limit is 500 ops)
+    const col = adminDb.collection("shopifyProducts");
+    let batch = adminDb.batch();
     let opCount = 0;
 
     for (const v of variants) {
@@ -66,11 +64,11 @@ export async function POST() {
         unitCost: storeLevel?.unitCost ?? null,
       };
       const docId = v.variantId.split("/").pop()!;
-      batch.set(doc(col, docId), product);
+      batch.set(col.doc(docId), product);
       opCount++;
       if (opCount === 499) {
         await batch.commit();
-        batch = writeBatch(db);
+        batch = adminDb.batch();
         opCount = 0;
       }
     }

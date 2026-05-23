@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore/lite";
+import { adminDb } from "@/lib/firebaseAdmin";
 import type { PurchaseOrder } from "@/lib/types";
 import { adjustInventory, toLocationGid } from "@/lib/shopify";
 
@@ -11,9 +10,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const ref = doc(db, "purchaseOrders", params.id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
+    const snap = await adminDb.collection("purchaseOrders").doc(params.id).get();
+    if (!snap.exists) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(snap.data() as PurchaseOrder);
@@ -29,18 +27,18 @@ export async function PUT(
 ) {
   try {
     const body = (await req.json()) as Partial<PurchaseOrder>;
-    const ref = doc(db, "purchaseOrders", params.id);
-    const existing = await getDoc(ref);
+    const ref = adminDb.collection("purchaseOrders").doc(params.id);
+    const existing = await ref.get();
 
     const now = new Date().toISOString();
     const merged: PurchaseOrder = {
-      ...(existing.exists() ? (existing.data() as PurchaseOrder) : ({} as PurchaseOrder)),
+      ...(existing.exists ? (existing.data() as PurchaseOrder) : ({} as PurchaseOrder)),
       ...body,
       id: params.id,
       updatedAt: now,
     } as PurchaseOrder;
 
-    await setDoc(ref, merged);
+    await ref.set(merged);
     return NextResponse.json(merged);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -53,10 +51,10 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const ref = doc(db, "purchaseOrders", params.id);
-    const snap = await getDoc(ref);
+    const ref = adminDb.collection("purchaseOrders").doc(params.id);
+    const snap = await ref.get();
 
-    if (snap.exists()) {
+    if (snap.exists) {
       const po = snap.data() as PurchaseOrder;
       const syncedItems = (po.syncResult?.results ?? []).filter(
         (r) => r.status === "synced" && r.inventoryItemId && r.delta
@@ -86,7 +84,7 @@ export async function DELETE(
       }
     }
 
-    await deleteDoc(ref);
+    await ref.delete();
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

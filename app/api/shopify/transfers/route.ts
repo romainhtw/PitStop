@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { moveInventory, toLocationGid } from "@/lib/shopify";
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  setDoc,
-} from "firebase/firestore/lite";
+import { adminDb } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -43,8 +35,7 @@ function locationGid(loc: TransferLocation): string {
 
 export async function GET() {
   try {
-    const q = query(collection(db, "transfers"), orderBy("executedAt", "desc"));
-    const snap = await getDocs(q);
+    const snap = await adminDb.collection("transfers").orderBy("executedAt", "desc").get();
     const records = snap.docs.map((d) => d.data() as TransferRecord);
     return NextResponse.json(records);
   } catch (err) {
@@ -104,7 +95,7 @@ export async function POST(req: NextRequest) {
         status: "error",
         error: userErrors.map((e) => e.message).join("; "),
       };
-      await setDoc(doc(db, "transfers", id), record);
+      await adminDb.collection("transfers").doc(id).set(record);
       return NextResponse.json({ error: record.error, userErrors }, { status: 422 });
     }
 
@@ -117,7 +108,7 @@ export async function POST(req: NextRequest) {
       shopifyGroupId: groupId,
       status: "done",
     };
-    await setDoc(doc(db, "transfers", id), record);
+    await adminDb.collection("transfers").doc(id).set(record);
 
     return NextResponse.json({ ok: true, transferId: id, shopifyGroupId: groupId });
   } catch (err) {

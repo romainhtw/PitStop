@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
-import { db } from "@/lib/firebase";
-import { collection, doc, writeBatch } from "firebase/firestore/lite";
+import { createHmac, timingSafeEqual } from "crypto";
+import { adminDb } from "@/lib/firebaseAdmin";
 import type { ShopifyProduct } from "@/lib/types";
 
 export const runtime = "nodejs";
 
 function verifyHmac(body: string, hmacHeader: string, secret: string): boolean {
   const computed = createHmac("sha256", secret).update(body, "utf8").digest("base64");
-  return computed === hmacHeader;
+  try {
+    return timingSafeEqual(Buffer.from(computed), Buffer.from(hmacHeader));
+  } catch {
+    return false;
+  }
 }
 
 interface WebhookVariant {
@@ -37,10 +40,13 @@ export async function POST(req: NextRequest) {
   const topic = req.headers.get("x-shopify-topic") ?? "";
 
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-  if (secret) {
-    if (!verifyHmac(rawBody, hmacHeader, secret)) {
-      return NextResponse.json({ error: "Invalid HMAC" }, { status: 401 });
-    }
+  // Always require a configured secret — reject if missing
+  if (!secret) {
+    console.error("[shopify-webhook] SHOPIFY_WEBHOOK_SECRET not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
+  if (!verifyHmac(rawBody, hmacHeader, secret)) {
+    return NextResponse.json({ error: "Invalid HMAC" }, { status: 401 });
   }
 
   let payload: WebhookProduct;
@@ -50,14 +56,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const col = collection(db, "shopifyProducts");
+  const col = adminDb.collection("shopifyProducts");
   const syncedAt = new Date().toISOString();
 
   if (topic === "products/delete") {
-    // Delete all variants for this product from the payload
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     for (const v of payload.variants ?? []) {
-      batch.delete(doc(col, String(v.id)));
+      batch.delete(col.doc(String(v.id)));
     }
     await batch.commit();
     return NextResponse.json({ ok: true, action: "deleted", productId: payload.id });
@@ -65,22 +70,21 @@ export async function POST(req: NextRequest) {
 
   // PRODUCTS_CREATE or PRODUCTS_UPDATE
   if (payload.status !== "active") {
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     for (const v of payload.variants ?? []) {
-      batch.delete(doc(col, String(v.id)));
+      batch.delete(col.doc(String(v.id)));
     }
     await batch.commit();
     return NextResponse.json({ ok: true, action: "removed_inactive", productId: payload.id });
   }
 
-  const batch = writeBatch(db);
+  const batch = adminDb.batch();
   const tags = payload.tags ? payload.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
 
   for (const v of payload.variants ?? []) {
     const variantId = `gid://shopify/ProductVariant/${v.id}`;
     const product: ShopifyProduct = {
       variantId,
-
       productId: `gid://shopify/Product/${payload.id}`,
       productTitle: payload.title,
       variantTitle: v.title === "Default Title" ? "" : v.title,
@@ -95,7 +99,7 @@ export async function POST(req: NextRequest) {
       shopifyUpdatedAt: payload.updated_at,
       syncedAt,
     };
-    batch.set(doc(col, String(v.id)), product);
+    batch.set(col.doc(String(v.id)), product);
   }
 
   await batch.commit();

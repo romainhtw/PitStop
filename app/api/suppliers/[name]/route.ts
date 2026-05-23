@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { doc, getDoc, setDoc } from "firebase/firestore/lite";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/firebaseAdmin";
 import type { SupplierProfile } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -14,9 +13,8 @@ export async function GET(
   { params }: { params: { name: string } }
 ) {
   try {
-    const ref = doc(db, "suppliers", supplierKey(params.name));
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
+    const snap = await adminDb.collection("suppliers").doc(supplierKey(params.name)).get();
+    if (!snap.exists) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(snap.data() as SupplierProfile);
@@ -33,21 +31,22 @@ export async function PUT(
   try {
     const body = await req.json() as Partial<SupplierProfile>;
     const key = supplierKey(params.name);
-    const ref = doc(db, "suppliers", key);
-    const existing = await getDoc(ref);
+    const ref = adminDb.collection("suppliers").doc(key);
+    const existing = await ref.get();
 
     const now = new Date().toISOString();
+    const existingData = existing.exists ? (existing.data() as SupplierProfile) : null;
     const merged: SupplierProfile = {
       id: key,
-      name: body.name || (existing.exists() ? (existing.data() as SupplierProfile).name : key),
-      parseHints: body.parseHints ?? (existing.exists() ? (existing.data() as SupplierProfile).parseHints : ""),
-      defaultLocation: body.defaultLocation ?? (existing.exists() ? (existing.data() as SupplierProfile).defaultLocation : ""),
-      approvedPOCount: existing.exists() ? (existing.data() as SupplierProfile).approvedPOCount ?? 0 : 0,
-      lastSeen: existing.exists() ? (existing.data() as SupplierProfile).lastSeen : now,
+      name: body.name || existingData?.name || key,
+      parseHints: body.parseHints ?? existingData?.parseHints ?? "",
+      defaultLocation: body.defaultLocation ?? existingData?.defaultLocation ?? "",
+      approvedPOCount: existingData?.approvedPOCount ?? 0,
+      lastSeen: existingData?.lastSeen ?? now,
       updatedAt: now,
     };
 
-    await setDoc(ref, merged);
+    await ref.set(merged);
     return NextResponse.json(merged);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

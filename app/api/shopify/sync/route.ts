@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore/lite";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/firebaseAdmin";
 import {
   findVariantBySku,
   searchVariantsByTitle,
@@ -11,7 +10,7 @@ import {
   checkLocation,
   toLocationGid,
 } from "@/lib/shopify";
-import { lookupMapping, saveMapping } from "@/lib/mappings";
+import { lookupMapping, saveMapping } from "@/lib/adminMappings";
 import type { AuditLog, PurchaseOrder, LineSyncResult, SyncResult, VariantSuggestion } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -103,21 +102,28 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch PO
-    const poRef = doc(db, "purchaseOrders", poId);
-    const poSnap = await getDoc(poRef);
-    if (!poSnap.exists()) return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
+    const poRef = adminDb.collection("purchaseOrders").doc(poId);
+    const poSnap = await poRef.get();
+    if (!poSnap.exists) return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
     const po = poSnap.data() as PurchaseOrder;
+
+    // ── Idempotency guard — reject re-sync on already-approved POs ──────
+    if (!dryRun && po.status === "approved" && po.syncResult) {
+      return NextResponse.json({
+        ...po.syncResult,
+        dryRun: false,
+        idempotent: true,
+        message: "This PO was already synced successfully. No changes made.",
+      });
+    }
 
     // ── Duplicate invoice detection ──────────────────────────────────────
     if (po.invoiceNumber) {
-      const dupSnap = await getDocs(
-        query(
-          collection(db, "purchaseOrders"),
-          where("invoiceNumber", "==", po.invoiceNumber),
-          where("supplier", "==", po.supplier),
-          where("status", "==", "approved")
-        )
-      );
+      const dupSnap = await adminDb.collection("purchaseOrders")
+        .where("invoiceNumber", "==", po.invoiceNumber)
+        .where("supplier", "==", po.supplier)
+        .where("status", "==", "approved")
+        .get();
       const existing = dupSnap.docs.find((d) => d.id !== poId);
       if (existing) {
         const existingData = existing.data() as PurchaseOrder;
@@ -140,9 +146,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Shopify location ID not configured for "${po.location}".` }, { status: 500 });
     }
 
-    // ── Location preflight check ─────────────────────────────────────────
+    // ── Location preflight check (best-effort — skip if token lacks read_locations scope) ──
     const locStatus = await checkLocation(locationGid);
-    if (!locStatus.isActive) {
+    if (locStatus.isActive === false && locStatus.checked === true) {
       return NextResponse.json({
         error: `Location "${po.location}" is inactive or archived in Shopify. Activate it before syncing.`,
         locationInactive: true,
@@ -383,7 +389,7 @@ export async function POST(req: NextRequest) {
     };
 
     const newStatus = syncResult.errorCount === 0 ? "approved" : "awaiting_review";
-    await updateDoc(poRef, {
+    await poRef.update({
       status: newStatus,
       syncResult,
       updatedAt: new Date().toISOString(),
@@ -410,7 +416,7 @@ export async function POST(req: NextRequest) {
           landedCost: r.landedCost,
         })),
       };
-      await setDoc(doc(collection(db, "auditLogs"), auditLog.id), auditLog).catch(() => {});
+      await adminDb.collection("auditLogs").doc(auditLog.id).set(auditLog).catch(() => {});
     }
 
     return NextResponse.json({ ...syncResult, dryRun: false, auditGroupId: groupId });

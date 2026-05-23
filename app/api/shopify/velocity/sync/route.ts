@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { shopifyFetch } from "@/lib/shopify";
-import { db } from "@/lib/firebase";
-import { doc, setDoc, writeBatch } from "firebase/firestore/lite";
+import { adminDb } from "@/lib/firebaseAdmin";
 import type { VelocityEntry } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -52,12 +51,11 @@ export async function POST() {
     const sinceIso = since.toISOString().slice(0, 10);
     const queryStr = `created_at:>=${sinceIso} financial_status:paid`;
 
-    // Accumulate units sold per SKU across all pages
     const unitsBySku = new Map<string, { variantId: string; productTitle: string; units: number }>();
 
     let cursor: string | null = null;
     let pagesFetched = 0;
-    const MAX_PAGES = 8; // 2000 orders max — more than enough for 90 days
+    const MAX_PAGES = 8;
 
     do {
       const result: Awaited<ReturnType<typeof shopifyFetch<OrdersData>>> = await shopifyFetch<OrdersData>(ORDERS_QUERY, {
@@ -94,13 +92,13 @@ export async function POST() {
       pagesFetched++;
     } while (cursor && pagesFetched < MAX_PAGES);
 
-    // Write velocity docs to Firestore in batches of 500
+    // Write velocity docs to Firestore in batches of 499
     const now = new Date().toISOString();
     const entries = Array.from(unitsBySku.entries());
-    const BATCH_SIZE = 499; // Firestore writeBatch limit is 500 ops
+    const BATCH_SIZE = 499;
 
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-      const batch = writeBatch(db);
+      const batch = adminDb.batch();
       for (const [sku, data] of entries.slice(i, i + BATCH_SIZE)) {
         const entry: VelocityEntry = {
           sku,
@@ -110,13 +108,13 @@ export async function POST() {
           velocityPerDay: parseFloat((data.units / windowDays).toFixed(4)),
           lastSyncedAt: now,
         };
-        batch.set(doc(db, "velocityCache", sku), entry);
+        batch.set(adminDb.collection("velocityCache").doc(sku), entry);
       }
       await batch.commit();
     }
 
     // Store sync metadata
-    await setDoc(doc(db, "velocityMeta", "latest"), {
+    await adminDb.collection("velocityMeta").doc("latest").set({
       syncedAt: now,
       skuCount: unitsBySku.size,
       pagesFetched,

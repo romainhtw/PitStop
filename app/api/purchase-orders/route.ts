@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  getDocs,
-  orderBy,
-  query,
-  doc,
-  setDoc,
-} from "firebase/firestore/lite";
+import { adminDb } from "@/lib/firebaseAdmin";
 import { v4 as uuidv4 } from "uuid";
 import type { PurchaseOrder } from "@/lib/types";
 
@@ -15,8 +7,10 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const q = query(collection(db, "purchaseOrders"), orderBy("createdAt", "desc"));
-    const snap = await getDocs(q);
+    const snap = await adminDb
+      .collection("purchaseOrders")
+      .orderBy("createdAt", "desc")
+      .get();
     const orders = snap.docs.map((d) => d.data() as PurchaseOrder);
     return NextResponse.json(orders);
   } catch (err) {
@@ -46,7 +40,7 @@ export async function POST(req: NextRequest) {
       updatedAt: now,
     };
 
-    await setDoc(doc(db, "purchaseOrders", id), po);
+    await adminDb.collection("purchaseOrders").doc(id).set(po);
     return NextResponse.json(po);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
