@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { collection, doc, writeBatch } from "firebase/firestore/lite";
-import { fetchAllActiveVariants } from "@/lib/shopify";
+import { fetchAllActiveVariants, fetchInventoryLevels, toLocationGid } from "@/lib/shopify";
 import type { ShopifyProduct } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -16,13 +16,55 @@ export async function POST() {
     const variants = await fetchAllActiveVariants();
     const syncedAt = new Date().toISOString();
 
+    // Fetch inventory levels for both locations in parallel
+    const storeGid = toLocationGid(process.env.SHOPIFY_LOCATION_ID_STORE);
+    const warehouseGid = toLocationGid(process.env.SHOPIFY_LOCATION_ID_WAREHOUSE);
+    const inventoryItemIds = variants.map((v) => v.inventoryItemId);
+
+    // Batch into 250-item chunks (Shopify nodes() limit)
+    const CHUNK = 250;
+    const storeMap = new Map<string, { onHandQty: number; unitCost: number | null }>();
+    const warehouseMap = new Map<string, number>();
+
+    // Build all chunks, then fetch all in parallel (up to 6 at a time to avoid rate limits)
+    const chunks: string[][] = [];
+    for (let i = 0; i < inventoryItemIds.length; i += CHUNK) {
+      chunks.push(inventoryItemIds.slice(i, i + CHUNK));
+    }
+
+    const CONCURRENCY = 6;
+    for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+      const batch = chunks.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        batch.map(async (chunk) => {
+          const [storeLevels, warehouseLevels] = await Promise.all([
+            storeGid ? fetchInventoryLevels(chunk, storeGid) : Promise.resolve([]),
+            warehouseGid ? fetchInventoryLevels(chunk, warehouseGid) : Promise.resolve([]),
+          ]);
+          for (const l of storeLevels) {
+            storeMap.set(l.inventoryItemId, { onHandQty: l.onHandQty, unitCost: l.unitCost });
+          }
+          for (const l of warehouseLevels) {
+            warehouseMap.set(l.inventoryItemId, l.onHandQty);
+          }
+        })
+      );
+    }
+
     // Write in batches of 500 (Firestore limit)
     const col = collection(db, "shopifyProducts");
     let batch = writeBatch(db);
     let opCount = 0;
 
     for (const v of variants) {
-      const product: ShopifyProduct = { ...v, syncedAt };
+      const storeLevel = storeMap.get(v.inventoryItemId);
+      const product: ShopifyProduct = {
+        ...v,
+        syncedAt,
+        onHandQtyStore: storeLevel?.onHandQty ?? 0,
+        onHandQtyWarehouse: warehouseMap.get(v.inventoryItemId) ?? 0,
+        unitCost: storeLevel?.unitCost ?? null,
+      };
       const docId = v.variantId.split("/").pop()!;
       batch.set(doc(col, docId), product);
       opCount++;

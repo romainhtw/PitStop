@@ -61,12 +61,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     desktop: "🖥",
   };
 
-  // Active state: purchase orders highlights on any /purchase-orders/* path
   function navClass(href: string) {
     const isActive =
       href === "/purchase-orders/new"
         ? pathname.startsWith("/purchase-orders")
-        : pathname === href;
+        : pathname === href || (href !== "/purchase-orders/new" && pathname.startsWith(href + "/") && href !== "/");
     return isActive
       ? "flex items-center px-3 py-2 rounded text-sm font-semibold bg-brand-sage/60 text-brand-green"
       : "flex items-center px-3 py-2 rounded text-sm font-medium text-gray-600 hover:bg-brand-sage/30 hover:text-brand-green transition-colors";
@@ -140,6 +139,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </Link>
           <Link href="/build" className={navClass("/build")} onClick={onClose}>
             Build
+          </Link>
+          <Link href="/reorder" className={navClass("/reorder")} onClick={onClose}>
+            Reorder
+          </Link>
+          <Link href="/transfers" className={navClass("/transfers")} onClick={onClose}>
+            Transfers
+          </Link>
+          <Link href="/audit" className={navClass("/audit")} onClick={onClose}>
+            Audit Trail
           </Link>
         </nav>
 

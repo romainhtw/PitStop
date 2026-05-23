@@ -1,5 +1,21 @@
 export type POStatus = "draft" | "awaiting_review" | "ordered" | "approved";
 
+export type ReconcileStatus = "EXACT" | "COST_DRIFT" | "QTY_SHORTAGE" | "SURPLUS" | "SKU_MISMATCH";
+
+export interface ReconcileLineResult {
+  poLineId: string | null;
+  invoiceLineIdx: number;
+  name: string;
+  sku: string;
+  status: ReconcileStatus;
+  expectedQty: number;
+  actualQty: number;
+  expectedCost: number;
+  actualCost: number;
+  qtyDelta: number;
+  costDriftPct: number;
+}
+
 export interface LineItemOptionValue {
   optionName: string;
   optionValue: string;
@@ -54,6 +70,11 @@ export interface LineSyncResult {
   currentQty?: number;
   shopifyCategory?: string;
   matchedFromCache?: boolean;
+  costDrift?: { historicalCost: number; parsedCost: number; pctChange: number };
+  landedCost?: number;
+  initialQty?: number;
+  conflictError?: { expectedQty: number; actualQty: number; suggestedQty: number };
+  untrackedInventory?: boolean;
 }
 
 export interface SyncResult {
@@ -62,6 +83,8 @@ export interface SyncResult {
   successCount: number;
   notFoundCount: number;
   errorCount: number;
+  duplicateInvoice?: { detectedAt: string; originalPoId: string };
+  locationInactive?: boolean;
 }
 
 export interface InventoryEntry {
@@ -88,6 +111,17 @@ export interface SupplierProfile {
   approvedPOCount: number;
   lastSeen: string;
   updatedAt: string;
+  leadTimeDays?: number;
+  safetyStockDays?: number;
+}
+
+export interface VelocityEntry {
+  sku: string;
+  variantId?: string;
+  productTitle: string;
+  unitsSold90d: number;
+  velocityPerDay: number;
+  lastSyncedAt: string;
 }
 
 export interface ShopifyProduct {
@@ -105,6 +139,29 @@ export interface ShopifyProduct {
   tags: string[];
   shopifyUpdatedAt: string;
   syncedAt: string;
+  onHandQtyStore?: number;
+  onHandQtyWarehouse?: number;
+  unitCost?: number | null;
+}
+
+export interface AuditLog {
+  id: string;
+  poId: string;
+  supplier: string;
+  invoiceNumber: string;
+  location: string;
+  syncedAt: string;
+  successCount: number;
+  notFoundCount: number;
+  errorCount: number;
+  referenceDocumentUri: string;
+  items: Array<{
+    name: string;
+    sku: string;
+    status: string;
+    delta?: number;
+    landedCost?: number;
+  }>;
 }
 
 export interface PurchaseOrder {
@@ -113,6 +170,7 @@ export interface PurchaseOrder {
   invoiceNumber: string;
   invoiceDate: string;
   currency?: string;
+  exchangeRate?: number;
   taxVatNumber?: string;
   orderNumber: string;
   location: "In-Store Fitzgerald St" | "Warehouse";

@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { PurchaseOrder, POStatus } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { collection, getDocs, query, orderBy } from "firebase/firestore/lite";
+import { db } from "@/lib/firebase";
+import type { PurchaseOrder, POStatus, ShopifyProduct } from "@/lib/types";
 import FeedbackChat from "@/components/FeedbackChat";
 
 const PO_CHAT_CONTEXT = `The user is talking about the Purchase Orders feature in PitStop — an internal ops tool for Elite Racing Cycles, a bike shop in Perth with 10 staff and 5 per shift.
@@ -108,16 +111,53 @@ function DeleteButton({ po, onDelete }: { po: PurchaseOrder; onDelete: (id: stri
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [stockAlerts, setStockAlerts] = useState<{ out: number; low: number } | null>(null);
+  const [reusing, setReusing] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/purchase-orders")
       .then((r) => r.json())
       .then((data) => setOrders(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
+
+    // Fetch stock alert counts from Firestore catalog
+    getDocs(query(collection(db, "shopifyProducts"), orderBy("productTitle")))
+      .then((snap) => {
+        const products = snap.docs.map((d) => d.data() as ShopifyProduct);
+        const out = products.filter((p) => (p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0) <= 0).length;
+        const low = products.filter((p) => { const q = (p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0); return q > 0 && q <= 3; }).length;
+        setStockAlerts({ out, low });
+      })
+      .catch(() => {});
   }, []);
+
+  async function handleReuse(po: PurchaseOrder) {
+    setReusing(po.id);
+    try {
+      const res = await fetch("/api/purchase-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplier: po.supplier,
+          location: po.location,
+          paymentTerms: po.paymentTerms,
+          currency: po.currency,
+          lineItems: po.lineItems.map((li) => ({ ...li, hidden: false })),
+          shippingCost: po.shippingCost,
+          invoiceTotals: po.invoiceTotals,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      router.push(`/purchase-orders/${data.id}/review`);
+    } catch {
+      setReusing(null);
+    }
+  }
 
   function handleDelete(id: string) {
     setOrders((prev) => prev.filter((po) => po.id !== id));
@@ -147,6 +187,23 @@ export default function DashboardPage() {
     0
   );
 
+  // Supplier spend analytics — computed from approved POs only
+  const supplierSpend = orders
+    .filter((po) => po.status === "approved")
+    .reduce<Record<string, { spend: number; poCount: number; items: number }>>((acc, po) => {
+      const key = po.supplier || "Unknown";
+      const cost = po.lineItems.reduce((s, li) => s + li.qty * li.costPrice, 0);
+      const items = po.lineItems.reduce((s, li) => s + li.qty, 0);
+      if (!acc[key]) acc[key] = { spend: 0, poCount: 0, items: 0 };
+      acc[key].spend += cost;
+      acc[key].poCount += 1;
+      acc[key].items += items;
+      return acc;
+    }, {});
+  const supplierRows = Object.entries(supplierSpend)
+    .sort((a, b) => b[1].spend - a[1].spend)
+    .slice(0, 10);
+
   return (
     <div className="p-4 lg:p-10 max-w-7xl">
       <div className="flex items-center justify-between mb-8">
@@ -165,7 +222,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded border border-gray-200 p-5">
           <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Total Cost Value</div>
           <div className="font-display text-5xl leading-none text-brand-green mt-2">
@@ -184,6 +241,29 @@ export default function DashboardPage() {
             {loading ? <span className="text-gray-200 animate-pulse">—</span> : totalItems}
           </div>
         </div>
+        <Link href="/catalog?filter=out" className="block bg-white rounded border border-gray-200 p-5 hover:border-brand-green transition-colors group">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Stock Alerts</div>
+          {stockAlerts === null ? (
+            <div className="font-display text-5xl leading-none text-gray-200 animate-pulse mt-2">—</div>
+          ) : stockAlerts.out === 0 && stockAlerts.low === 0 ? (
+            <div className="font-display text-5xl leading-none text-emerald-500 mt-2">✓</div>
+          ) : (
+            <div className="mt-2 space-y-1">
+              {stockAlerts.out > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                  <span className="text-sm font-semibold text-red-600">{stockAlerts.out} out of stock</span>
+                </div>
+              )}
+              {stockAlerts.low > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                  <span className="text-sm font-semibold text-amber-600">{stockAlerts.low} low stock</span>
+                </div>
+              )}
+            </div>
+          )}
+        </Link>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -241,7 +321,24 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center justify-between mt-3">
                       <Link href={`/purchase-orders/${po.id}/review`} className="text-xs font-medium text-brand-green hover:underline">View →</Link>
-                      <DeleteButton po={po} onDelete={handleDelete} />
+                      <div className="flex items-center gap-3">
+                        {po.status === "ordered" && (
+                          <Link
+                            href={`/purchase-orders/${po.id}/reconcile`}
+                            className="text-xs font-medium text-blue-600 hover:underline"
+                          >
+                            Receive Invoice
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => handleReuse(po)}
+                          disabled={reusing === po.id}
+                          className="text-xs text-gray-400 hover:text-brand-green transition-colors disabled:opacity-50"
+                        >
+                          {reusing === po.id ? "Creating…" : "Reuse"}
+                        </button>
+                        <DeleteButton po={po} onDelete={handleDelete} />
+                      </div>
                     </div>
                   </div>
                 );
@@ -283,9 +380,26 @@ export default function DashboardPage() {
                         <td className="px-5 py-3">{fmt(cost)}</td>
                         <td className="px-5 py-3">{statusBadge(po.status)}</td>
                         <td className="px-5 py-3 text-right">
-                          <Link href={`/purchase-orders/${po.id}/review`} className="text-sm font-medium text-brand-green hover:underline">
-                            View
-                          </Link>
+                          <div className="flex items-center justify-end gap-4">
+                            {po.status === "ordered" && (
+                              <Link
+                                href={`/purchase-orders/${po.id}/reconcile`}
+                                className="text-sm font-medium text-blue-600 hover:underline"
+                              >
+                                Receive Invoice
+                              </Link>
+                            )}
+                            <button
+                              onClick={() => handleReuse(po)}
+                              disabled={reusing === po.id}
+                              className="text-sm text-gray-400 hover:text-brand-green transition-colors disabled:opacity-50"
+                            >
+                              {reusing === po.id ? "Creating…" : "Reuse"}
+                            </button>
+                            <Link href={`/purchase-orders/${po.id}/review`} className="text-sm font-medium text-brand-green hover:underline">
+                              View
+                            </Link>
+                          </div>
                         </td>
                         <td className="px-5 py-3 text-center">
                           <DeleteButton po={po} onDelete={handleDelete} />
@@ -299,6 +413,52 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {/* Supplier Spend Analytics */}
+      {supplierRows.length > 0 && (
+        <div className="mt-8 bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-200">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Supplier Spend — Approved POs</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-100">
+                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Supplier</th>
+                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-right">Total Spend</th>
+                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-right">POs</th>
+                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-right">Items</th>
+                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {supplierRows.map(([supplier, data]) => {
+                  const share = totalCost > 0 ? (data.spend / totalCost) * 100 : 0;
+                  return (
+                    <tr key={supplier} className="border-b border-gray-50 last:border-0 hover:bg-brand-sage/10">
+                      <td className="px-5 py-3 font-medium text-gray-800">{supplier}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-brand-green">{fmt(data.spend)}</td>
+                      <td className="px-5 py-3 text-right text-gray-500">{data.poCount}</td>
+                      <td className="px-5 py-3 text-right text-gray-500">{data.items}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-brand-green rounded-full"
+                              style={{ width: `${Math.min(share, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-400 w-10 text-right">{share.toFixed(0)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

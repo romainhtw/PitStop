@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import BackButton from "@/components/BackButton";
 import { v4 as uuidv4 } from "uuid";
 import type { InvoiceTotals, LineItem, PurchaseOrder, SyncResult, VariantSuggestion } from "@/lib/types";
+import { loadCatalog } from "@/lib/catalogCache";
 
 interface CreateFormFields {
   title: string;
@@ -107,6 +108,7 @@ export default function ReviewPurchaseOrderPage() {
   const [paymentTerms, setPaymentTerms] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [shippingCost, setShippingCost] = useState(0);
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [invoiceTotals, setInvoiceTotals] = useState<InvoiceTotals | undefined>(undefined);
   const [supplierNotes, setSupplierNotes] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
@@ -114,6 +116,7 @@ export default function ReviewPurchaseOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [pdfPaneOpen, setPdfPaneOpen] = useState(false);
   const [markingOrdered, setMarkingOrdered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -124,6 +127,11 @@ export default function ReviewPurchaseOrderPage() {
 
   type ConfirmedMapping = { variantId: string; inventoryItemId: string; productTitle: string };
   const [confirmedMappings, setConfirmedMappings] = useState<Record<string, ConfirmedMapping>>({});
+  const [duplicateInvoiceError, setDuplicateInvoiceError] = useState<{ detectedAt: string; originalPoId: string } | null>(null);
+  type ConflictItem = { lineItemId: string; name: string; expectedQty: number; actualQty: number; suggestedQty: number };
+  const [conflictItems, setConflictItems] = useState<ConflictItem[]>([]);
+
+  const [catalogCategories, setCatalogCategories] = useState<string[]>([]);
 
   const [manualSearchQueries, setManualSearchQueries] = useState<Record<string, string>>({});
   const [manualSearchResults, setManualSearchResults] = useState<Record<string, VariantSuggestion[]>>({});
@@ -132,6 +140,13 @@ export default function ReviewPurchaseOrderPage() {
   const [showCreateFor, setShowCreateFor] = useState<Record<string, boolean>>({});
   const [createFormData, setCreateFormData] = useState<Record<string, { title: string; sku: string; barcode: string; price: string; productType: string }>>({});
   const [creating, setCreating] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    loadCatalog().then((products) => {
+      const types = Array.from(new Set(products.map((p) => p.productType).filter(Boolean))).sort();
+      setCatalogCategories(types);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -149,6 +164,7 @@ export default function ReviewPurchaseOrderPage() {
         setLocation(po.location || "In-Store Fitzgerald St");
         setPaymentTerms(po.paymentTerms || "");
         setShippingCost(Number(po.shippingCost) || 0);
+        if (po.exchangeRate) setExchangeRate(po.exchangeRate);
         if (po.invoiceTotals) setInvoiceTotals(po.invoiceTotals);
         setLineItems(
           (po.lineItems || []).map((li) => ({
@@ -208,6 +224,35 @@ export default function ReviewPurchaseOrderPage() {
   // GST applies to GST-applicable goods + shipping (standard Australian treatment)
   const gst = (gstableItemsTotal + shipping) * 0.1;
   const total = subtotal + shipping + gst;
+
+  // Bulk sync warning — >50 visible items risk a timeout
+  const visibleItemCount = lineItems.filter((li) => !li.hidden).length;
+  const isBulkPO = visibleItemCount > 50;
+
+  // Math hard block — disable Preview + Sync if invoice total mismatches by > $1
+  const mathDiscrepancy = useMemo(() => {
+    if (!invoiceTotals?.grandTotal || invoiceTotals.grandTotal <= 0) return false;
+    return Math.abs(total - invoiceTotals.grandTotal) > 1;
+  }, [total, invoiceTotals]);
+
+  // Live landed cost recalc — updates instantly when freight/customs fields change
+  const liveLandedCosts = useMemo(() => {
+    if (!previewResult) return new Map<string, number>();
+    const surcharge = (invoiceTotals?.freightShipping ?? 0) + (invoiceTotals?.insurance ?? 0) + (invoiceTotals?.customsTariffs ?? 0) + (invoiceTotals?.brokerageFees ?? 0);
+    const matched = previewResult.results.filter((r) => r.inventoryItemId);
+    const items = matched.map((r) => {
+      const li = lineItems.find((li) => li.id === r.lineItemId);
+      return { lineItemId: r.lineItemId, costPrice: li?.costPrice ?? 0, qty: li?.qty ?? 0 };
+    });
+    const invoiceValue = items.reduce((s, it) => s + it.costPrice * it.qty, 0);
+    const map = new Map<string, number>();
+    for (const it of items) {
+      const share = invoiceValue > 0 ? (it.costPrice * it.qty) / invoiceValue : 0;
+      const allocation = surcharge > 0 ? (share * surcharge) / Math.max(it.qty, 1) : 0;
+      map.set(it.lineItemId, it.costPrice + allocation);
+    }
+    return map;
+  }, [previewResult, invoiceTotals, lineItems]);
 
   const updateItem = (idx: number, patch: Partial<LineItem>) =>
     setLineItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -297,7 +342,7 @@ export default function ReviewPurchaseOrderPage() {
     setLineItems((prev) => prev.filter((_, i) => i !== idx));
 
   function buildPayload() {
-    return { supplier, invoiceNumber, invoiceDate, currency, taxVatNumber, orderNumber, location, paymentTerms, lineItems, shippingCost: Number(shippingCost) || 0, invoiceTotals };
+    return { supplier, invoiceNumber, invoiceDate, currency, exchangeRate: currency !== "AUD" ? exchangeRate : undefined, taxVatNumber, orderNumber, location, paymentTerms, lineItems, shippingCost: Number(shippingCost) || 0, invoiceTotals };
   }
 
   async function saveSupplierNotes() {
@@ -372,6 +417,8 @@ export default function ReviewPurchaseOrderPage() {
   const handleConfirmSync = async () => {
     setSyncing(true);
     setError(null);
+    setDuplicateInvoiceError(null);
+    setConflictItems([]);
     try {
       const syncRes = await fetch("/api/shopify/sync", {
         method: "POST",
@@ -379,9 +426,24 @@ export default function ReviewPurchaseOrderPage() {
         body: JSON.stringify({ poId: id, overrides: confirmedMappings }),
       });
       const syncData = await syncRes.json();
+      if (syncRes.status === 409 || syncData.duplicateInvoice) {
+        setDuplicateInvoiceError(syncData.duplicateInvoice);
+        return;
+      }
       if (!syncRes.ok) throw new Error(syncData.error || "Shopify sync failed");
+      const result = syncData as SyncResult;
+      const conflicts: ConflictItem[] = (result.results ?? [])
+        .filter((r) => r.conflictError)
+        .map((r) => ({
+          lineItemId: r.lineItemId,
+          name: r.name,
+          expectedQty: r.conflictError!.expectedQty,
+          actualQty: r.conflictError!.actualQty,
+          suggestedQty: r.conflictError!.suggestedQty,
+        }));
+      if (conflicts.length > 0) setConflictItems(conflicts);
       setPreviewResult(null);
-      setSyncResult(syncData as SyncResult);
+      setSyncResult(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -407,7 +469,19 @@ export default function ReviewPurchaseOrderPage() {
   }
 
   return (
-    <div className="p-10 max-w-6xl">
+    <div className={pdfPaneOpen && pdfUrl ? "flex h-screen overflow-hidden" : ""}>
+      {/* Split-pane PDF viewer */}
+      {pdfPaneOpen && pdfUrl && (
+        <div className="w-1/2 h-full border-r border-gray-200 flex flex-col shrink-0">
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Invoice PDF</span>
+            <button onClick={() => setPdfPaneOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+          </div>
+          <iframe src={pdfUrl} className="flex-1 w-full" title="Invoice PDF" />
+        </div>
+      )}
+
+      <div className={`${pdfPaneOpen && pdfUrl ? "flex-1 overflow-y-auto" : ""} p-10 max-w-6xl`}>
       <div className="mb-4"><BackButton /></div>
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -417,20 +491,29 @@ export default function ReviewPurchaseOrderPage() {
           </p>
         </div>
         {/* Always-visible actions */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
           {pdfUrl && (
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-brand-green border border-gray-200 hover:border-brand-green px-3 py-2 rounded transition-colors"
+            <button
+              onClick={() => setPdfPaneOpen((o) => !o)}
+              className={`inline-flex items-center gap-1.5 text-sm border px-3 py-2 rounded transition-colors ${pdfPaneOpen ? "border-brand-green text-brand-green bg-brand-sage/20" : "border-gray-200 text-gray-500 hover:border-brand-green hover:text-brand-green"}`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
-              View PDF
-            </a>
+              {pdfPaneOpen ? "Close PDF" : "View PDF"}
+            </button>
           )}
+          <a
+            href={`/purchase-orders/${params.id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm border border-gray-200 text-gray-500 hover:border-brand-green hover:text-brand-green px-3 py-2 rounded transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download PO
+          </a>
           {poStatus !== "approved" && (
             <button
               onClick={handleMarkOrdered}
@@ -492,6 +575,24 @@ export default function ReviewPurchaseOrderPage() {
             </label>
             <input className={inputCls} value={taxVatNumber} placeholder="e.g. ABN 12 345 678 901" onChange={(e) => setTaxVatNumber(e.target.value)} />
           </div>
+          {currency && currency !== "AUD" && (
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">
+                Exchange Rate
+                <span className="ml-1 text-gray-400 font-normal">1 {currency} = ? AUD</span>
+              </label>
+              <input
+                type="number"
+                step="0.0001"
+                min={0}
+                className={inputCls}
+                value={exchangeRate}
+                placeholder="e.g. 1.52"
+                onChange={(e) => setExchangeRate(Number(e.target.value) || 1)}
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Applied to cost prices when syncing to Shopify.</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -656,15 +757,7 @@ export default function ReviewPurchaseOrderPage() {
       </div>
 
       <datalist id="category-options">
-        <option value="Helmets" />
-        <option value="Components" />
-        <option value="Apparel" />
-        <option value="Accessories" />
-        <option value="Bikes" />
-        <option value="Footwear" />
-        <option value="Electronics" />
-        <option value="Tools" />
-        <option value="Nutrition" />
+        {catalogCategories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
       {/* Totals */}
@@ -714,6 +807,24 @@ export default function ReviewPurchaseOrderPage() {
         <div className="mb-5 p-4 rounded bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
 
+      {isBulkPO && (
+        <div className="mb-5 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
+          <p className="font-semibold">Large PO — {visibleItemCount} items</p>
+          <p className="mt-0.5 text-blue-700">
+            Syncing more than 50 items at once may approach the 60-second server limit. If the sync times out, try hiding non-essential rows and syncing in smaller batches.
+          </p>
+        </div>
+      )}
+
+      {mathDiscrepancy && (
+        <div className="mb-5 p-4 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm">
+          <p className="font-semibold">Mathematical discrepancy — sync blocked</p>
+          <p className="mt-0.5 text-red-700">
+            Line items sum to <strong>${total.toFixed(2)}</strong> but invoice total is <strong>${invoiceTotals?.grandTotal?.toFixed(2)}</strong> (Δ ${Math.abs(total - (invoiceTotals?.grandTotal ?? 0)).toFixed(2)}). Correct the line items or totals before syncing.
+          </p>
+        </div>
+      )}
+
       {/* Action Buttons */}
       {!syncResult && !previewResult && (
         <div className="flex items-center justify-end gap-3">
@@ -731,7 +842,7 @@ export default function ReviewPurchaseOrderPage() {
           ) : (
             <button
               onClick={handlePreview}
-              disabled={isBusy}
+              disabled={isBusy || mathDiscrepancy}
               className="inline-flex items-center gap-2 bg-brand-green hover:bg-brand-green/90 disabled:opacity-50 text-white text-sm font-medium px-6 py-2.5 rounded transition-colors"
             >
               {previewing ? (
@@ -800,6 +911,7 @@ export default function ReviewPurchaseOrderPage() {
                   <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Shopify Product</th>
                   <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">In Stock</th>
                   <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Qty to Add</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Landed Cost</th>
                   <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Status</th>
                 </tr>
               </thead>
@@ -970,6 +1082,12 @@ export default function ReviewPurchaseOrderPage() {
                               ? `+${lineItem?.qty ?? r.delta ?? "?"}`
                               : r.delta != null ? `+${r.delta}` : "—"}
                           </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">
+                            {(() => {
+                              const lc = liveLandedCosts.get(r.lineItemId) ?? r.landedCost;
+                              return lc ? `$${lc.toFixed(2)}` : "—";
+                            })()}
+                          </td>
                           <td className="px-4 py-3">
                             {(r.status === "synced" || isConfirmed) && (
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full" title={r.matchedFromCache ? "Matched from saved mapping" : undefined}>
@@ -985,10 +1103,26 @@ export default function ReviewPurchaseOrderPage() {
                           </td>
                         </tr>
                       )}
+                      {/* Cost drift badge */}
+                      {r.costDrift && (
+                        <tr className="border-b border-yellow-50 bg-yellow-50/50">
+                          <td colSpan={7} className="px-4 py-1.5 text-xs text-yellow-800">
+                            ⚠️ Cost drift: Shopify has ${r.costDrift.historicalCost.toFixed(2)}, invoice shows ${r.costDrift.parsedCost.toFixed(2)} ({r.costDrift.pctChange > 0 ? "+" : ""}{r.costDrift.pctChange}%)
+                          </td>
+                        </tr>
+                      )}
+                      {/* Untracked inventory warning */}
+                      {r.untrackedInventory && (
+                        <tr className="border-b border-gray-50 bg-gray-50/60">
+                          <td colSpan={7} className="px-4 py-1.5 text-xs text-gray-500">
+                            ℹ️ Inventory not tracked in Shopify — quantity will not be updated for this item.
+                          </td>
+                        </tr>
+                      )}
                       {/* Missing field hint for synced items */}
                       {r.status === "synced" && r.shopifyMissingFields && r.shopifyMissingFields.length > 0 && (
                         <tr className="border-b border-gray-50 bg-blue-50/40">
-                          <td colSpan={6} className="px-4 py-2">
+                          <td colSpan={7} className="px-4 py-2">
                             <p className="text-xs text-blue-700">
                               💡 Matched but Shopify product is missing:{" "}
                               {r.shopifyMissingFields.map((f, i) => (
@@ -1090,6 +1224,51 @@ export default function ReviewPurchaseOrderPage() {
               </tbody>
             </table>
           </div>
+          {duplicateInvoiceError && (
+            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-300">
+              <p className="text-sm font-semibold text-amber-800">
+                Duplicate invoice detected — this invoice was already synced. Check PO{" "}
+                <a href={`/purchase-orders/${duplicateInvoiceError.originalPoId}/review`} className="underline hover:text-amber-900">
+                  {duplicateInvoiceError.originalPoId}
+                </a>.
+              </p>
+              <p className="text-xs text-amber-700 mt-1">Originally synced at: {duplicateInvoiceError.detectedAt}</p>
+            </div>
+          )}
+          {conflictItems.length > 0 && (
+            <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-300">
+              <p className="text-sm font-semibold text-red-800 mb-2">
+                Inventory conflict — quantities changed while you were reviewing. Re-run the sync with the suggested quantities below.
+              </p>
+              <table className="w-full text-xs mb-3">
+                <thead>
+                  <tr className="text-left text-red-700 border-b border-red-200">
+                    <th className="py-1 pr-4 font-semibold">Item</th>
+                    <th className="py-1 pr-4 font-semibold">Expected on hand</th>
+                    <th className="py-1 pr-4 font-semibold">Actual on hand</th>
+                    <th className="py-1 font-semibold">Suggested qty to add</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {conflictItems.map((ci) => (
+                    <tr key={ci.lineItemId} className="border-b border-red-100 last:border-0">
+                      <td className="py-1 pr-4 text-red-900 font-medium">{ci.name}</td>
+                      <td className="py-1 pr-4 text-red-700">{ci.expectedQty}</td>
+                      <td className="py-1 pr-4 text-red-700">{ci.actualQty}</td>
+                      <td className="py-1 text-red-900 font-semibold">+{ci.suggestedQty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button
+                onClick={handleConfirmSync}
+                disabled={syncing}
+                className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded transition-colors"
+              >
+                {syncing ? "Re-syncing…" : "Re-sync with suggested quantities →"}
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={() => { setPreviewResult(null); setConfirmedMappings({}); }}
@@ -1204,6 +1383,7 @@ export default function ReviewPurchaseOrderPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

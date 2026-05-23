@@ -1,4 +1,4 @@
-const API_VERSION = "2025-01";
+const API_VERSION = "2025-04";
 
 export function shopifyGraphqlUrl(): string {
   return `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
@@ -79,6 +79,62 @@ const FIND_VARIANT_WITH_INVENTORY_QUERY = /* GraphQL */ `
     }
   }
 `;
+
+const BATCH_ADJUST_MUTATION = /* GraphQL */ `
+  mutation BatchAdjust($input: InventoryAdjustQuantitiesInput!) {
+    inventoryAdjustQuantities(input: $input) {
+      inventoryAdjustmentGroup {
+        id
+        reason
+        referenceDocumentUri
+        changes { name delta quantityAfterChange }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+interface BatchAdjustData {
+  inventoryAdjustQuantities: {
+    inventoryAdjustmentGroup: {
+      id: string;
+      reason: string;
+      referenceDocumentUri: string;
+      changes: Array<{ name: string; delta: number; quantityAfterChange: number }>;
+    } | null;
+    userErrors: Array<{ field: string; message: string }>;
+  };
+}
+
+export interface BatchAdjustChange {
+  inventoryItemId: string;
+  locationId: string;
+  delta: number;
+}
+
+export async function batchAdjustInventory(
+  changes: BatchAdjustChange[],
+  reason: string,
+  referenceDocumentUri: string
+): Promise<{ userErrors: Array<{ field: string; message: string }>; groupId?: string }> {
+  if (changes.length === 0) return { userErrors: [] };
+
+  const CHUNK = 250;
+  const allErrors: Array<{ field: string; message: string }> = [];
+  let groupId: string | undefined;
+
+  for (let i = 0; i < changes.length; i += CHUNK) {
+    const chunk = changes.slice(i, i + CHUNK);
+    const result = await shopifyFetch<BatchAdjustData>(BATCH_ADJUST_MUTATION, {
+      input: { name: "available", reason, referenceDocumentUri, changes: chunk },
+    });
+    const data = result?.data?.inventoryAdjustQuantities;
+    if (data?.userErrors?.length) allErrors.push(...data.userErrors);
+    if (data?.inventoryAdjustmentGroup?.id) groupId = data.inventoryAdjustmentGroup.id;
+  }
+
+  return { userErrors: allErrors, groupId };
+}
 
 export const ADJUST_INVENTORY_MUTATION = /* GraphQL */ `
   mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
@@ -194,7 +250,7 @@ function extractCoreModel(name: string): string {
   return core.slice(0, 2).join(" ");
 }
 
-async function fetchVariantsByQuery(q: string): Promise<ShopifyVariantNode[]> {
+export async function fetchVariantsByQuery(q: string): Promise<ShopifyVariantNode[]> {
   const result = await shopifyFetch<SearchProductsData>(SEARCH_BY_TITLE_QUERY, { q });
   const products = result?.data?.products?.nodes ?? [];
   const variants: ShopifyVariantNode[] = [];
@@ -401,5 +457,233 @@ export async function adjustInventory(
   return {
     userErrors:
       result?.data?.inventoryAdjustQuantities?.userErrors ?? [],
+  };
+}
+
+const FETCH_INVENTORY_LEVELS_QUERY = /* GraphQL */ `
+  query FetchInventoryLevels($ids: [ID!]!, $locationId: ID!) {
+    nodes(ids: $ids) {
+      ... on InventoryItem {
+        id
+        tracked
+        unitCost { amount currencyCode }
+        inventoryLevel(locationId: $locationId) {
+          quantities(names: ["on_hand"]) {
+            name
+            quantity
+          }
+        }
+      }
+    }
+  }
+`;
+
+interface FetchInventoryLevelsData {
+  nodes: Array<{
+    id: string;
+    tracked?: boolean;
+    unitCost?: { amount: string; currencyCode: string } | null;
+    inventoryLevel?: {
+      quantities: Array<{ name: string; quantity: number }>;
+    } | null;
+  }>;
+}
+
+export interface InventoryLevelResult {
+  inventoryItemId: string;
+  onHandQty: number;
+  unitCost: number | null;
+  tracked: boolean;
+}
+
+export async function fetchInventoryLevels(
+  inventoryItemIds: string[],
+  locationGid: string
+): Promise<InventoryLevelResult[]> {
+  if (inventoryItemIds.length === 0) return [];
+  const result = await shopifyFetch<FetchInventoryLevelsData>(
+    FETCH_INVENTORY_LEVELS_QUERY,
+    { ids: inventoryItemIds, locationId: locationGid }
+  );
+  return (result?.data?.nodes ?? []).map((node) => ({
+    inventoryItemId: node.id,
+    onHandQty: node.inventoryLevel?.quantities?.find((q) => q.name === "on_hand")?.quantity ?? 0,
+    unitCost: node.unitCost ? parseFloat(node.unitCost.amount) : null,
+    tracked: node.tracked ?? true,
+  }));
+}
+
+const CHECK_LOCATION_QUERY = /* GraphQL */ `
+  query CheckLocation($id: ID!) {
+    location(id: $id) {
+      id
+      isActive
+      fulfillsOnlineOrders
+    }
+  }
+`;
+
+interface CheckLocationData {
+  location: { id: string; isActive: boolean; fulfillsOnlineOrders: boolean } | null;
+}
+
+export async function checkLocation(locationGid: string): Promise<{ isActive: boolean; fulfillsOnlineOrders: boolean }> {
+  const result = await shopifyFetch<CheckLocationData>(CHECK_LOCATION_QUERY, { id: locationGid });
+  const loc = result?.data?.location;
+  if (!loc) return { isActive: false, fulfillsOnlineOrders: false };
+  return { isActive: loc.isActive, fulfillsOnlineOrders: loc.fulfillsOnlineOrders };
+}
+
+const SET_INVENTORY_BATCH_MUTATION = /* GraphQL */ `
+  mutation InventorySetBatch($input: InventorySetQuantitiesInput!) {
+    inventorySetQuantities(input: $input) {
+      inventoryAdjustmentGroup {
+        id
+        createdAt
+        reason
+        referenceDocumentUri
+      }
+      userErrors {
+        field
+        message
+        code
+      }
+    }
+  }
+`;
+
+interface SetInventoryData {
+  inventorySetQuantities: {
+    inventoryAdjustmentGroup: { id: string; createdAt: string; referenceDocumentUri?: string } | null;
+    userErrors: Array<{ field: string; message: string; code?: string }>;
+  };
+}
+
+export interface BatchSetItem {
+  inventoryItemId: string;
+  quantity: number;        // absolute target qty (Q_initial + Q_parsed)
+  changeFromQuantity: number; // Q_initial captured before review
+}
+
+export async function batchSetInventory(
+  items: BatchSetItem[],
+  locationGid: string,
+  referenceDocumentUri: string
+): Promise<{ userErrors: Array<{ field: string; message: string; code?: string }>; groupId?: string }> {
+  if (items.length === 0) return { userErrors: [] };
+
+  // Shopify inventorySetQuantities accepts max 250 per call — chunk if needed
+  const CHUNK = 250;
+  const allErrors: Array<{ field: string; message: string; code?: string }> = [];
+  let groupId: string | undefined;
+
+  for (let i = 0; i < items.length; i += CHUNK) {
+    const chunk = items.slice(i, i + CHUNK);
+    const result = await shopifyFetch<SetInventoryData>(SET_INVENTORY_BATCH_MUTATION, {
+      input: {
+        name: "on_hand",
+        reason: "received",
+        referenceDocumentUri,
+        quantities: chunk.map((it) => ({
+          inventoryItemId: it.inventoryItemId,
+          locationId: locationGid,
+          quantity: it.quantity,
+          changeFromQuantity: it.changeFromQuantity,
+        })),
+      },
+    });
+    const data = result?.data?.inventorySetQuantities;
+    if (data?.userErrors?.length) allErrors.push(...data.userErrors);
+    if (data?.inventoryAdjustmentGroup?.id) groupId = data.inventoryAdjustmentGroup.id;
+  }
+
+  return { userErrors: allErrors, groupId };
+}
+
+const UPDATE_ITEM_COST_MUTATION = /* GraphQL */ `
+  mutation UpdateItemCost($id: ID!, $input: InventoryItemInput!) {
+    inventoryItemUpdate(id: $id, input: $input) {
+      inventoryItem { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+export async function updateInventoryItemCost(
+  inventoryItemId: string,
+  cost: number
+): Promise<void> {
+  await shopifyFetch(UPDATE_ITEM_COST_MUTATION, {
+    id: inventoryItemId,
+    input: { cost: cost.toFixed(4) },
+  });
+}
+
+const MOVE_INVENTORY_MUTATION = /* GraphQL */ `
+  mutation MoveInventory($input: InventoryMoveQuantitiesInput!) {
+    inventoryMoveQuantities(input: $input) {
+      inventoryAdjustmentGroup {
+        id
+        createdAt
+        reason
+        changes {
+          name
+          delta
+          quantityAfterChange
+          item { id }
+          location { id name }
+        }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+interface MoveInventoryData {
+  inventoryMoveQuantities: {
+    inventoryAdjustmentGroup: {
+      id: string;
+      createdAt: string;
+      reason: string;
+      changes: Array<{
+        name: string;
+        delta: number;
+        quantityAfterChange: number;
+        item: { id: string };
+        location: { id: string; name: string };
+      }>;
+    } | null;
+    userErrors: Array<{ field: string; message: string }>;
+  };
+}
+
+export interface TransferChange {
+  inventoryItemId: string;
+  fromLocationId: string;
+  toLocationId: string;
+  quantity: number;
+}
+
+export async function moveInventory(
+  changes: TransferChange[]
+): Promise<{ userErrors: Array<{ field: string; message: string }>; groupId?: string }> {
+  if (changes.length === 0) return { userErrors: [] };
+
+  const result = await shopifyFetch<MoveInventoryData>(MOVE_INVENTORY_MUTATION, {
+    input: {
+      reason: "correction",
+      changes: changes.map((c) => ({
+        inventoryItemId: c.inventoryItemId,
+        fromLocationId: c.fromLocationId,
+        toLocationId: c.toLocationId,
+        quantity: c.quantity,
+      })),
+    },
+  });
+
+  const data = result?.data?.inventoryMoveQuantities;
+  return {
+    userErrors: data?.userErrors ?? [],
+    groupId: data?.inventoryAdjustmentGroup?.id,
   };
 }

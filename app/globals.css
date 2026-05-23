@@ -24,3 +24,10 @@ html.force-mobile aside[data-open="true"] { transform: translateX(0) !important;
 html.force-desktop .lg\:ml-56 { margin-left: 14rem !important; }
 html.force-desktop .lg\:hidden { display: none !important; }
 html.force-desktop aside { transform: translateX(0) !important; display: flex !important; }
+
+@media print {
+  aside, nav, header, [data-no-print] { display: none !important; }
+  main { margin-left: 0 !important; }
+  body { background: white !important; }
+  @page { margin: 15mm 15mm 15mm 15mm; size: A4; }
+}
