@@ -5,8 +5,6 @@ const nextConfig = {
       {
         source: "/:path*",
         headers: [
-          // Prevent embedding in iframes (clickjacking)
-          { key: "X-Frame-Options", value: "DENY" },
           // Stop MIME-type sniffing
           { key: "X-Content-Type-Options", value: "nosniff" },
           // Enforce HTTPS for 1 year
@@ -36,6 +34,8 @@ const nextConfig = {
               "media-src 'self' blob:",
               // Frame sources for Stripe
               "frame-src https://js.stripe.com https://hooks.stripe.com",
+              // Allow Shopify Admin to embed this app in an iframe
+              "frame-ancestors https://admin.shopify.com https://*.myshopify.com",
               // Object/embed
               "object-src 'none'",
               // Base URI restriction
