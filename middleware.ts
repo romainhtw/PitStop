@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
 
 // Routes that bypass auth entirely (have their own HMAC verification)
 const WEBHOOK_PATHS = /^\/api\/(billing\/webhook|shopify\/webhooks)/;
@@ -8,14 +7,21 @@ const PUBLIC_PATHS = /^\/(_next|favicon\.ico|logo\.png|public)/;
 // The login page and its API endpoint
 const AUTH_PATHS = /^\/(login|api\/auth)/;
 
-function cookieValid(cookieValue: string | undefined): boolean {
-  const pin = process.env.PITSTOP_PIN;
-  if (!pin || !cookieValue) return false;
-  const expected = createHash("sha256").update(pin).digest("hex");
+// Use Web Crypto API (available in Edge runtime) instead of Node's crypto
+async function sha256hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function cookieValid(cookieValue: string | undefined, pin: string): Promise<boolean> {
+  if (!cookieValue) return false;
+  const expected = await sha256hex(pin);
   return cookieValue === expected;
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Always allow: webhooks (own HMAC), static, auth routes
@@ -24,10 +30,11 @@ export function middleware(req: NextRequest) {
   if (AUTH_PATHS.test(pathname)) return NextResponse.next();
 
   // If no PITSTOP_PIN is configured, allow all (dev mode / env not set yet)
-  if (!process.env.PITSTOP_PIN) return NextResponse.next();
+  const pin = process.env.PITSTOP_PIN;
+  if (!pin) return NextResponse.next();
 
   const cookie = req.cookies.get("pitstop_auth")?.value;
-  if (cookieValid(cookie)) return NextResponse.next();
+  if (await cookieValid(cookie, pin)) return NextResponse.next();
 
   // API routes → 401 JSON (don't redirect — client fetch would silently fail)
   if (pathname.startsWith("/api/")) {
