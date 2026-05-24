@@ -25,6 +25,17 @@ export default function RootLayout({
         />
       </head>
       <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+        {/* Orange halo — fixed overlay, pointer-events off so it never blocks clicks */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            pointerEvents: "none",
+            zIndex: 9999,
+            boxShadow: "inset 0 0 120px 20px rgba(255,90,0,0.08)",
+          }}
+        />
         <AppShell />
         <main className="lg:ml-56 min-h-screen">{children}</main>
       </body>
