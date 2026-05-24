@@ -4,24 +4,56 @@ export function shopifyGraphqlUrl(): string {
   return `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`;
 }
 
+// Full-jitter exponential backoff: sleep random(0, min(cap_ms, base_ms * 2^attempt))
+function jitterDelay(attempt: number, baseMs = 500, capMs = 8000): Promise<void> {
+  const ceiling = Math.min(capMs, baseMs * Math.pow(2, attempt));
+  const ms = Math.random() * ceiling;
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function shopifyFetch<T = unknown>(
   query: string,
-  variables?: Record<string, unknown>
+  variables?: Record<string, unknown>,
+  maxRetries = 4
 ): Promise<{ data?: T; errors?: Array<{ message: string }> }> {
-  const res = await fetch(shopifyGraphqlUrl(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(shopifyGraphqlUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
 
-  if (!res.ok) {
-    throw new Error(`Shopify API error: ${res.status} ${res.statusText}`);
+    // 429 or 5xx — back off and retry
+    if (res.status === 429 || res.status >= 500) {
+      if (attempt < maxRetries) {
+        await jitterDelay(attempt);
+        continue;
+      }
+      throw new Error(`Shopify API error: ${res.status} ${res.statusText}`);
+    }
+
+    if (!res.ok) {
+      throw new Error(`Shopify API error: ${res.status} ${res.statusText}`);
+    }
+
+    const json = await res.json() as { data?: T; errors?: Array<{ message: string; extensions?: { code?: string } }> };
+
+    // GraphQL-level throttle (leaky bucket exhausted)
+    const throttled = json.errors?.some(
+      (e) => e.extensions?.code === "THROTTLED" || e.message?.toLowerCase().includes("throttled")
+    );
+    if (throttled && attempt < maxRetries) {
+      await jitterDelay(attempt);
+      continue;
+    }
+
+    return json;
   }
 
-  return res.json();
+  throw new Error("Shopify API: max retries exceeded");
 }
 
 export function toLocationGid(envVal: string | undefined): string {
@@ -527,11 +559,12 @@ interface CheckLocationData {
   location: { id: string; isActive: boolean; fulfillsOnlineOrders: boolean } | null;
 }
 
-export async function checkLocation(locationGid: string): Promise<{ isActive: boolean; fulfillsOnlineOrders: boolean }> {
+export async function checkLocation(locationGid: string): Promise<{ isActive: boolean; fulfillsOnlineOrders: boolean; checked: boolean }> {
   const result = await shopifyFetch<CheckLocationData>(CHECK_LOCATION_QUERY, { id: locationGid });
   const loc = result?.data?.location;
-  if (!loc) return { isActive: false, fulfillsOnlineOrders: false };
-  return { isActive: loc.isActive, fulfillsOnlineOrders: loc.fulfillsOnlineOrders };
+  // If loc is null (e.g. token lacks read_locations scope), treat as unverifiable — don't block sync
+  if (!loc) return { isActive: false, fulfillsOnlineOrders: false, checked: false };
+  return { isActive: loc.isActive, fulfillsOnlineOrders: loc.fulfillsOnlineOrders, checked: true };
 }
 
 const SET_INVENTORY_BATCH_MUTATION = /* GraphQL */ `

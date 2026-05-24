@@ -121,46 +121,68 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </Link>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          <Link href="/dashboard" className={navClass("/dashboard")} onClick={onClose}>
-            Dashboard
-          </Link>
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+
+          {/* ── STOCK ───────────────────────────────────────── */}
+          <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">Stock</p>
           <Link href="/purchase-orders/new" className={navClass("/purchase-orders/new")} onClick={onClose}>
             Purchase Orders
-          </Link>
-          <Link href="/catalog" className={navClass("/catalog")} onClick={onClose}>
-            Catalog
           </Link>
           <Link href="/stock-take" className={navClass("/stock-take")} onClick={onClose}>
             Stock Take
           </Link>
-          <Link href="/price-audit" className={navClass("/price-audit")} onClick={onClose}>
-            Price Audit
-          </Link>
-          <Link href="/build" className={navClass("/build")} onClick={onClose}>
-            Build
-          </Link>
           <Link href="/reorder" className={navClass("/reorder")} onClick={onClose}>
             Reorder
+          </Link>
+
+          {/* ── CATALOG ─────────────────────────────────────── */}
+          <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">Catalog</p>
+          <Link href="/catalog" className={navClass("/catalog")} onClick={onClose}>
+            Catalog
+          </Link>
+          <Link href="/price-audit" className={navClass("/price-audit")} onClick={onClose}>
+            Price Audit
           </Link>
           <Link href="/transfers" className={navClass("/transfers")} onClick={onClose}>
             Transfers
           </Link>
+
+          {/* ── INSIGHTS ────────────────────────────────────── */}
+          <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">Insights</p>
+          <Link href="/dashboard" className={navClass("/dashboard")} onClick={onClose}>
+            Dashboard
+          </Link>
           <Link href="/audit" className={navClass("/audit")} onClick={onClose}>
             Audit Trail
           </Link>
+
         </nav>
 
-        <div className="px-6 py-4 border-t border-gray-200 space-y-2">
-          <p className="text-[10px] text-gray-300">Perth, WA</p>
+        <div className="px-4 py-4 border-t border-gray-200 space-y-1">
+          {/* Billing as settings-style link */}
+          <Link
+            href="/billing"
+            className={`flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors ${
+              pathname === "/billing"
+                ? "text-brand-green font-semibold"
+                : "text-gray-400 hover:text-gray-600"
+            }`}
+            onClick={onClose}
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+            </svg>
+            Billing
+          </Link>
           <button
             onClick={cycleViewMode}
-            className="flex items-center gap-2 text-[11px] text-gray-400 hover:text-brand-green transition-colors w-full"
+            className="flex items-center gap-2 px-3 py-2 text-[11px] text-gray-400 hover:text-brand-green transition-colors w-full rounded"
             title="Cycle view: auto → mobile → desktop"
           >
             <span className="text-base leading-none">{modeIcon[viewMode]}</span>
             <span>View: {modeLabel[viewMode]}</span>
           </button>
+          <p className="px-3 text-[10px] text-gray-300">Perth, WA</p>
         </div>
       </aside>
     </>

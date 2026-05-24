@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { v4 as uuidv4 } from "uuid";
+import { waitUntil } from "@vercel/functions";
 import { adminDb } from "@/lib/firebaseAdmin";
 import type { PurchaseOrder } from "@/lib/types";
+
+const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -15,7 +18,8 @@ async function getSupplierHints(): Promise<string> {
     ]);
     if (!snap) return "";
     const hints: string[] = [];
-    (snap as FirebaseFirestore.QuerySnapshot).forEach((d) => {
+    // snap is a FirebaseFirestore.QuerySnapshot — forEach works directly
+    snap.forEach((d) => {
       const s = d.data() as { name?: string; parseHints?: string };
       if (s.parseHints?.trim()) hints.push(`  - Supplier "${s.name}": ${s.parseHints.trim()}`);
     });
@@ -39,6 +43,9 @@ export async function POST(req: NextRequest) {
     }
     if (file.type !== "application/pdf") {
       return NextResponse.json({ error: "Only PDF files are supported" }, { status: 400 });
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      return NextResponse.json({ error: "PDF exceeds the 10 MB limit" }, { status: 413 });
     }
 
     console.log("[parse-invoice] File received:", file.name, file.size, "bytes");
@@ -197,7 +204,7 @@ export async function POST(req: NextRequest) {
         brokerageFees: Number(totals.brokerageFees) || 0,
         grandTotal: Number(totals.grandTotal) || 0,
       } : undefined,
-      lineItems: ((parsed.lineItems as unknown[]) || []).map((li) => {
+      lineItems: (Array.isArray(parsed.lineItems) ? parsed.lineItems : []).map((li) => {
         const l = li as Record<string, unknown>;
         return {
           id: uuidv4(),
@@ -228,14 +235,16 @@ export async function POST(req: NextRequest) {
     await adminDb.collection("purchaseOrders").doc(poId).set(po);
     console.log("[parse-invoice] Saved to Firestore OK");
 
-    // Upsert supplier in background (non-critical)
+    // Upsert supplier in background — use waitUntil so Vercel doesn't freeze before the write completes
     if (parsed.supplier) {
       const supplierName = parsed.supplier as string;
       const key = supplierName.toLowerCase().trim();
-      adminDb.collection("suppliers").doc(key).set(
-        { name: supplierName, lastSeen: now },
-        { merge: true }
-      ).catch(() => {});
+      waitUntil(
+        adminDb.collection("suppliers").doc(key).set(
+          { name: supplierName, lastSeen: now },
+          { merge: true }
+        ).catch(() => {})
+      );
     }
 
     console.log("[parse-invoice] Done, returning id:", poId);

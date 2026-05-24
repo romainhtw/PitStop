@@ -35,7 +35,7 @@ function locationGid(loc: TransferLocation): string {
 
 export async function GET() {
   try {
-    const snap = await adminDb.collection("transfers").orderBy("executedAt", "desc").get();
+    const snap = await adminDb.collection("transfers").orderBy("executedAt", "desc").limit(100).get();
     const records = snap.docs.map((d) => d.data() as TransferRecord);
     return NextResponse.json(records);
   } catch (err) {

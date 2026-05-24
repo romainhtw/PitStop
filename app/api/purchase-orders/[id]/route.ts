@@ -30,13 +30,17 @@ export async function PUT(
     const ref = adminDb.collection("purchaseOrders").doc(params.id);
     const existing = await ref.get();
 
+    if (!existing.exists) {
+      return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
+    }
+
     const now = new Date().toISOString();
     const merged: PurchaseOrder = {
-      ...(existing.exists ? (existing.data() as PurchaseOrder) : ({} as PurchaseOrder)),
+      ...(existing.data() as PurchaseOrder),
       ...body,
       id: params.id,
       updatedAt: now,
-    } as PurchaseOrder;
+    };
 
     await ref.set(merged);
     return NextResponse.json(merged);

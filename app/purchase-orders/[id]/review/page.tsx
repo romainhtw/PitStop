@@ -165,7 +165,21 @@ export default function ReviewPurchaseOrderPage() {
         setPaymentTerms(po.paymentTerms || "");
         setShippingCost(Number(po.shippingCost) || 0);
         if (po.exchangeRate) setExchangeRate(po.exchangeRate);
-        if (po.invoiceTotals) setInvoiceTotals(po.invoiceTotals);
+        if (po.invoiceTotals) {
+          const it = po.invoiceTotals;
+          // Detect if taxTotal was stored using the old buggy formula (GST on subtotal + freight).
+          // If taxTotal ≈ (subtotal + freightShipping) × 10%, it was calculated wrong — correct it.
+          const oldFormulaGst = (it.subtotal + it.freightShipping) * 0.1;
+          const wasOldFormula = Math.abs(it.taxTotal - oldFormulaGst) < 0.02;
+          if (wasOldFormula && it.subtotal > 0) {
+            const correctedTax = it.subtotal * 0.1;
+            const correctedGrand = it.subtotal + correctedTax + it.freightShipping
+              + it.insurance + it.customsTariffs + it.brokerageFees;
+            setInvoiceTotals({ ...it, taxTotal: correctedTax, grandTotal: correctedGrand });
+          } else {
+            setInvoiceTotals(it);
+          }
+        }
         setLineItems(
           (po.lineItems || []).map((li) => ({
             id: li.id || uuidv4(),
@@ -221,8 +235,8 @@ export default function ReviewPurchaseOrderPage() {
     [lineItems]
   );
   const shipping = Number(shippingCost) || 0;
-  // GST applies to GST-applicable goods + shipping (standard Australian treatment)
-  const gst = (gstableItemsTotal + shipping) * 0.1;
+  // GST applies to GST-applicable goods only — freight is not always GST-rated on supplier invoices
+  const gst = gstableItemsTotal * 0.1;
   const total = subtotal + shipping + gst;
 
   // Bulk sync warning — >50 visible items risk a timeout

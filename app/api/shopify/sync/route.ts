@@ -163,21 +163,18 @@ export async function POST(req: NextRequest) {
       ? po.exchangeRate
       : 1;
 
-    // ── MATCHING PHASE ───────────────────────────────────────────────────
+    // ── MATCHING PHASE — process items in parallel (max 5 concurrent Shopify calls) ──
     const visibleItems = po.lineItems.filter((li) => !li.hidden);
-    const results: LineSyncResult[] = [];
 
-    for (const item of visibleItems) {
+    const matchItem = async (item: typeof visibleItems[0]): Promise<LineSyncResult> => {
       const result: LineSyncResult = {
         lineItemId: item.id,
         sku: item.sku,
         name: item.name,
         status: "not_found",
       };
-
       try {
         const override = overrides?.[item.id];
-
         if (override) {
           result.shopifyVariantId = override.variantId;
           result.inventoryItemId = override.inventoryItemId;
@@ -224,10 +221,8 @@ export async function POST(req: NextRequest) {
                 if (item.sku) await saveMapping(po.supplier, item.sku, matchData);
                 if (item.barcode) await saveMapping(po.supplier, item.barcode, matchData);
               }
-            } else {
-              if (dryRun) {
-                result.suggestions = await enrichedTitleSearch(item.name, item.optionValues);
-              }
+            } else if (dryRun) {
+              result.suggestions = await enrichedTitleSearch(item.name, item.optionValues);
             }
           }
         }
@@ -235,8 +230,15 @@ export async function POST(req: NextRequest) {
         result.status = "error";
         result.errorMessage = err instanceof Error ? err.message : "Unknown error";
       }
+      return result;
+    }
 
-      results.push(result);
+    // Run in batches of 5 to respect Shopify GraphQL rate limits
+    const CONCURRENCY = 5;
+    const results: LineSyncResult[] = [];
+    for (let i = 0; i < visibleItems.length; i += CONCURRENCY) {
+      const batch = visibleItems.slice(i, i + CONCURRENCY);
+      results.push(...await Promise.all(batch.map(matchItem)));
     }
 
     // ── FETCH CURRENT INVENTORY LEVELS + COSTS ───────────────────────────
@@ -261,7 +263,7 @@ export async function POST(req: NextRequest) {
     );
     const landedCostMap = new Map<string, number>();
     matchedItems.forEach((item, idx) => {
-      landedCostMap.set(item.id, landedCostAllocations[idx]);
+      landedCostMap.set(item.id, landedCostAllocations[idx] ?? 0);
     });
 
     // ── ENRICH RESULTS with qty, cost drift, landed cost ─────────────────

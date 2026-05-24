@@ -10,9 +10,9 @@ const TOPICS = [
 ] as const;
 
 export async function POST() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : null;
+  // Fix: use ?? so NEXT_PUBLIC_APP_URL is preferred, VERCEL_URL is the fallback
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
 
   if (!baseUrl) {
     return NextResponse.json(

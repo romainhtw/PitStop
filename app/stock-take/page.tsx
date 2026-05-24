@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ShopifyProduct } from "@/lib/types";
 import { loadCatalog } from "@/lib/catalogCache";
-import { loadEntries, saveEntry, clearAllEntries } from "@/lib/stockTakeDb";
-import BarcodeScanner from "@/components/BarcodeScanner";
+import { loadEntries, saveEntry, clearAllEntries, syncCatalogToLocal, lookupByCode, lookupInMemory } from "@/lib/stockTakeDb";
+import BarcodeScanner, { type ScanResult } from "@/components/BarcodeScanner";
 
 type Entry = { counted: number; done: boolean };
 
@@ -18,6 +18,7 @@ export default function StockTakePage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [flashVariantId, setFlashVariantId] = useState<string | null>(null);
   const [scanFeedback, setScanFeedback] = useState<{ code: string; found: boolean } | null>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [commitResult, setCommitResult] = useState<{ success: boolean; adjustedCount: number; message?: string } | null>(null);
@@ -29,6 +30,8 @@ export default function StockTakePage() {
       setEntries(saved);
       setProducts(items);
       setLoading(false);
+      // Populate Dexie local catalog for multi-criteria scan lookup
+      syncCatalogToLocal(items).catch(() => {});
     });
   }, []);
 
@@ -45,33 +48,48 @@ export default function StockTakePage() {
     clearAllEntries();
   }
 
-  const handleScan = useCallback((code: string) => {
-    const match = products.find(
-      (p) =>
-        p.barcode?.trim() === code.trim() ||
-        p.sku?.trim() === code.trim()
-    );
-    if (!match) {
+  const handleScan = useCallback(async (code: string) => {
+    // 1. Try Dexie multi-criteria lookup (barcode → SKU → supplierSku)
+    const dbResult = await lookupByCode(code);
+    const variantId = dbResult?.item.variantId
+      ?? lookupInMemory(code, products)?.variantId;
+
+    if (!variantId) {
       setScanFeedback({ code, found: false });
+      setScanResult({ outcome: "notfound", label: code });
       setTimeout(() => setScanFeedback(null), 2000);
       return;
     }
-    // Increment count and mark done
-    patchEntry(match.variantId, {
-      counted: (entries[match.variantId]?.counted ?? 0) + 1,
+
+    const product = products.find((p) => p.variantId === variantId);
+    const label = product
+      ? `${product.productTitle}${product.variantTitle && product.variantTitle !== "Default Title" ? ` — ${product.variantTitle}` : ""}`
+      : variantId;
+
+    const isDuplicate = (entries[variantId]?.counted ?? 0) > 0;
+
+    // Increment count
+    patchEntry(variantId, {
+      counted: (entries[variantId]?.counted ?? 0) + 1,
       done: true,
     });
-    // Flash and scroll
-    setFlashVariantId(match.variantId);
+
+    // Feedback to scanner UI
+    setScanResult({
+      outcome: isDuplicate ? "duplicate" : "found",
+      label,
+      matchedOn: dbResult?.matchedOn ?? "barcode",
+    });
     setScanFeedback({ code, found: true });
-    setTimeout(() => setFlashVariantId(null), 1500);
     setTimeout(() => setScanFeedback(null), 2000);
-    // Expand the category if collapsed
-    const cat = match.productType || "Uncategorised";
+
+    // Flash row in the list and scroll to it
+    setFlashVariantId(variantId);
+    setTimeout(() => setFlashVariantId(null), 1500);
+    const cat = product?.productType || "Uncategorised";
     setCollapsed((prev) => ({ ...prev, [cat]: false }));
-    // Scroll to product row
     setTimeout(() => {
-      variantRefs.current[match.variantId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      variantRefs.current[variantId]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 100);
   }, [products, entries, patchEntry]);
 
@@ -232,7 +250,9 @@ export default function StockTakePage() {
       {scannerOpen && (
         <BarcodeScanner
           onDetected={handleScan}
-          onClose={() => setScannerOpen(false)}
+          onClose={() => { setScannerOpen(false); setScanResult(null); }}
+          scanResult={scanResult}
+          totalCounted={Object.values(entries).reduce((s, e) => s + (e.counted > 0 ? e.counted : 0), 0)}
         />
       )}
 

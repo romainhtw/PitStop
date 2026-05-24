@@ -5,11 +5,14 @@ import type { PurchaseOrder } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const url = new URL(req.url);
+    const limitParam = Math.min(parseInt(url.searchParams.get("limit") ?? "100"), 200);
     const snap = await adminDb
       .collection("purchaseOrders")
       .orderBy("createdAt", "desc")
+      .limit(limitParam)
       .get();
     const orders = snap.docs.map((d) => d.data() as PurchaseOrder);
     return NextResponse.json(orders);

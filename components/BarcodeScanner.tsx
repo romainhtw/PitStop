@@ -1,137 +1,200 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+
+export type ScanOutcome = "found" | "duplicate" | "notfound";
+
+export interface ScanResult {
+  outcome: ScanOutcome;
+  label: string;
+  matchedOn?: string;
+}
 
 interface BarcodeScannerProps {
   onDetected: (code: string) => void;
   onClose: () => void;
+  scanResult?: ScanResult | null;
+  totalCounted: number;
 }
 
-export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerProps) {
+// ── Audio (created once) ──────────────────────────────────────────────────────
+let audioCtx: AudioContext | null = null;
+function getAudioCtx() {
+  if (!audioCtx || audioCtx.state === "closed") audioCtx = new AudioContext();
+  return audioCtx;
+}
+function playTone(type: ScanOutcome) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const cfg = {
+      found:     { freq: 1200, dur: 0.10, vol: 0.22 },
+      duplicate: { freq: 880,  dur: 0.08, vol: 0.15 },
+      notfound:  { freq: 280,  dur: 0.28, vol: 0.18 },
+    }[type];
+    osc.frequency.value = cfg.freq;
+    gain.gain.setValueAtTime(cfg.vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + cfg.dur);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + cfg.dur);
+  } catch {}
+}
+function vibrate(type: ScanOutcome) {
+  if (!("vibrate" in navigator)) return;
+  const patterns: Record<ScanOutcome, number[]> = {
+    found:     [180],
+    duplicate: [60],
+    notfound:  [100, 60, 100],
+  };
+  navigator.vibrate(patterns[type]);
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function BarcodeScanner({ onDetected, onClose, scanResult, totalCounted }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [lastCode, setLastCode] = useState<string | null>(null);
+  const [flash, setFlash] = useState<ScanOutcome | null>(null);
+  const lastCodeRef = useRef<string>("");
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
 
+  const handleRaw = useCallback((code: string) => {
+    if (code === lastCodeRef.current) return;
+    lastCodeRef.current = code;
+    if (cooldownRef.current) clearTimeout(cooldownRef.current);
+    cooldownRef.current = setTimeout(() => { lastCodeRef.current = ""; }, 1600);
+    onDetected(code);
+  }, [onDetected]);
+
+  // Flash + haptic when parent reports result
+  useEffect(() => {
+    if (!scanResult) return;
+    playTone(scanResult.outcome);
+    vibrate(scanResult.outcome);
+    setFlash(scanResult.outcome);
+    const t = setTimeout(() => setFlash(null), 600);
+    return () => clearTimeout(t);
+  }, [scanResult]);
+
+  // Start camera
   useEffect(() => {
     let cancelled = false;
-
     async function start() {
       try {
         const { BrowserMultiFormatReader, BarcodeFormat } = await import("@zxing/browser");
         const { DecodeHintType } = await import("@zxing/library");
-
         const hints = new Map();
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-          BarcodeFormat.EAN_13,
-          BarcodeFormat.EAN_8,
-          BarcodeFormat.CODE_128,
-          BarcodeFormat.CODE_39,
-          BarcodeFormat.UPC_A,
-          BarcodeFormat.UPC_E,
-          BarcodeFormat.QR_CODE,
+          BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+          BarcodeFormat.CODE_128, BarcodeFormat.CODE_39,
+          BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+          BarcodeFormat.QR_CODE, BarcodeFormat.DATA_MATRIX, BarcodeFormat.ITF,
         ]);
         hints.set(DecodeHintType.TRY_HARDER, true);
+        hints.set(DecodeHintType.ASSUME_GS1, true);
 
-        const reader = new BrowserMultiFormatReader(hints);
-
-        if (!videoRef.current || cancelled) return;
-
-        const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
-          if (cancelled) return;
-          if (result) {
-            const code = result.getText();
-            setLastCode(code);
-            onDetected(code);
-          }
-          void err;
+        const reader = new BrowserMultiFormatReader(hints, {
+          delayBetweenScanAttempts: 80,
+          delayBetweenScanSuccess: 1600,
         });
-
+        if (!videoRef.current || cancelled) return;
+        const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
+          if (cancelled || !result) return;
+          handleRaw(result.getText());
+        });
         stopRef.current = () => controls.stop();
       } catch (e) {
-        if (!cancelled) {
-          const msg = e instanceof Error ? e.message : "Camera error";
-          if (msg.includes("Permission") || msg.includes("permission")) {
-            setError("Camera permission denied. Please allow camera access and try again.");
-          } else {
-            setError(msg);
-          }
-        }
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "Camera error";
+        setError(msg.toLowerCase().includes("permission")
+          ? "Camera permission denied — allow access and try again."
+          : msg);
       }
     }
-
     start();
+    return () => { cancelled = true; stopRef.current?.(); };
+  }, [handleRaw]);
 
-    return () => {
-      cancelled = true;
-      stopRef.current?.();
-    };
-  }, [onDetected]);
+  const borderCls =
+    flash === "found"     ? "border-green-400"  :
+    flash === "duplicate" ? "border-yellow-400" :
+    flash === "notfound"  ? "border-red-500"    :
+    "border-brand-green/50";
+
+  const overlayBg =
+    flash === "found"     ? "bg-green-400/10"  :
+    flash === "duplicate" ? "bg-yellow-400/10" :
+    flash === "notfound"  ? "bg-red-500/10"    :
+    "bg-transparent";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 py-4">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-5 py-4 shrink-0">
         <div>
-          <p className="text-white font-semibold text-sm">Barcode Scanner</p>
-          <p className="text-gray-400 text-xs mt-0.5">Point camera at a barcode or SKU label</p>
+          <p className="text-white font-semibold text-sm">Scanning</p>
+          <p className="text-gray-400 text-xs mt-0.5">Point at any barcode, QR or label</p>
         </div>
-        <button
-          onClick={onClose}
-          className="text-white text-2xl leading-none hover:text-gray-300 transition-colors w-9 h-9 flex items-center justify-center"
-          aria-label="Close scanner"
-        >
-          &times;
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Live counter */}
+          <div className="bg-brand-green text-white rounded-full w-12 h-12 flex flex-col items-center justify-center shadow-lg">
+            <span className="text-lg font-bold leading-none">{totalCounted}</span>
+            <span className="text-[8px] opacity-75 uppercase tracking-wide">items</span>
+          </div>
+          <button onClick={onClose} className="text-white text-2xl leading-none hover:text-gray-300 transition-colors w-9 h-9 flex items-center justify-center">
+            &times;
+          </button>
+        </div>
       </div>
 
       {/* Viewfinder */}
-      <div className="relative w-full max-w-sm aspect-[3/4] rounded-xl overflow-hidden border-2 border-brand-green/60 shadow-2xl">
+      <div className={`relative flex-1 border-4 transition-colors duration-150 ${borderCls}`}>
         {error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-center px-6">
-            <svg className="w-10 h-10 text-red-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-            </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-center px-8 gap-3">
             <p className="text-red-300 text-sm font-medium">{error}</p>
           </div>
         ) : (
           <>
-            <video
-              ref={videoRef}
-              className="absolute inset-0 w-full h-full object-cover"
-              playsInline
-              muted
-              autoPlay
-            />
-            {/* Scan line animation */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-0.5 bg-brand-green/80 animate-pulse" />
-              {/* Corner markers */}
-              {[
-                "top-4 left-4 border-t-2 border-l-2 rounded-tl-sm",
-                "top-4 right-4 border-t-2 border-r-2 rounded-tr-sm",
-                "bottom-4 left-4 border-b-2 border-l-2 rounded-bl-sm",
-                "bottom-4 right-4 border-b-2 border-r-2 rounded-br-sm",
-              ].map((cls, i) => (
-                <div key={i} className={`absolute w-6 h-6 border-brand-green ${cls}`} />
-              ))}
+            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+            <div className={`absolute inset-0 pointer-events-none transition-colors duration-150 ${overlayBg}`} />
+            {/* Target guide */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="relative w-72 h-44">
+                {["top-0 left-0 border-t-2 border-l-2", "top-0 right-0 border-t-2 border-r-2",
+                  "bottom-0 left-0 border-b-2 border-l-2", "bottom-0 right-0 border-b-2 border-r-2"]
+                  .map((cls, i) => <div key={i} className={`absolute w-6 h-6 border-white/60 ${cls}`} />)}
+                <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-px bg-brand-green/70 animate-pulse" />
+              </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Last detected */}
-      <div className="absolute bottom-0 left-0 right-0 px-5 pb-8 text-center">
-        {lastCode ? (
-          <div className="bg-brand-green/20 border border-brand-green/40 rounded-xl px-4 py-3 inline-block">
-            <p className="text-[10px] text-brand-green/70 uppercase tracking-widest font-semibold mb-0.5">Last scanned</p>
-            <p className="text-white font-mono text-sm font-semibold">{lastCode}</p>
+      {/* Result bar */}
+      <div className="shrink-0 min-h-[60px] flex items-center px-5 py-3 bg-gray-950">
+        {scanResult ? (
+          <div className="flex items-center gap-3 w-full">
+            <span className={`text-xl leading-none font-bold ${
+              scanResult.outcome === "found"     ? "text-green-400"  :
+              scanResult.outcome === "duplicate" ? "text-yellow-400" : "text-red-400"
+            }`}>
+              {scanResult.outcome === "found" ? "✓" : scanResult.outcome === "duplicate" ? "↑" : "✗"}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-medium truncate">{scanResult.label}</p>
+              <p className="text-[10px] mt-0.5">
+                {scanResult.outcome === "found"     && <span className="text-gray-500 uppercase tracking-wide">matched on {scanResult.matchedOn}</span>}
+                {scanResult.outcome === "duplicate" && <span className="text-yellow-500/70">Already scanned — qty incremented</span>}
+                {scanResult.outcome === "notfound"  && <span className="text-red-400/70">No match — check SKU or add to catalog</span>}
+              </p>
+            </div>
           </div>
         ) : (
-          !error && (
-            <p className="text-gray-500 text-xs">Waiting for barcode…</p>
-          )
+          <p className="text-gray-600 text-xs mx-auto">Waiting for scan…</p>
         )}
       </div>
     </div>

@@ -60,28 +60,36 @@ export async function POST(req: NextRequest) {
   const syncedAt = new Date().toISOString();
 
   if (topic === "products/delete") {
-    const batch = adminDb.batch();
-    for (const v of payload.variants ?? []) {
-      batch.delete(col.doc(String(v.id)));
+    const variants = (payload.variants ?? []).filter((v) => v.id);
+    if (variants.length > 0) {
+      const batch = adminDb.batch();
+      for (const v of variants) batch.delete(col.doc(String(v.id)));
+      await batch.commit();
     }
-    await batch.commit();
     return NextResponse.json({ ok: true, action: "deleted", productId: payload.id });
   }
 
   // PRODUCTS_CREATE or PRODUCTS_UPDATE
   if (payload.status !== "active") {
-    const batch = adminDb.batch();
-    for (const v of payload.variants ?? []) {
-      batch.delete(col.doc(String(v.id)));
+    const variants = (payload.variants ?? []).filter((v) => v.id);
+    if (variants.length > 0) {
+      const batch = adminDb.batch();
+      for (const v of variants) batch.delete(col.doc(String(v.id)));
+      await batch.commit();
     }
-    await batch.commit();
     return NextResponse.json({ ok: true, action: "removed_inactive", productId: payload.id });
   }
 
-  const batch = adminDb.batch();
   const tags = payload.tags ? payload.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
+  // Skip variants without a valid inventory_item_id (can be absent on some webhook payloads)
+  const validVariants = (payload.variants ?? []).filter((v) => v.id && v.inventory_item_id);
 
-  for (const v of payload.variants ?? []) {
+  if (validVariants.length === 0) {
+    return NextResponse.json({ ok: true, action: "skipped_no_valid_variants", productId: payload.id });
+  }
+
+  const batch = adminDb.batch();
+  for (const v of validVariants) {
     const variantId = `gid://shopify/ProductVariant/${v.id}`;
     const product: ShopifyProduct = {
       variantId,
@@ -103,5 +111,5 @@ export async function POST(req: NextRequest) {
   }
 
   await batch.commit();
-  return NextResponse.json({ ok: true, action: "upserted", variants: payload.variants?.length ?? 0 });
+  return NextResponse.json({ ok: true, action: "upserted", variants: validVariants.length });
 }
