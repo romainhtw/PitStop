@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -107,20 +106,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Wordmark + logo */}
         <div className="flex-none px-5 pt-4 pb-3.5 border-b border-border-0">
-          <Link href="/dashboard" className="flex flex-col gap-2" onClick={onClose}>
+          <Link href="/dashboard" onClick={onClose}>
             <PitStopLogo />
-            <div className="flex items-center gap-2">
-              <span className="text-2xs font-mono text-text-tertiary uppercase tracking-widest">by</span>
-              <Image
-                src="/logo.png"
-                alt="Elite Racing Cycles"
-                width={80}
-                height={40}
-                className="w-[72px] h-auto"
-                style={{ filter: "brightness(0) invert(1)", opacity: 0.35 }}
-                priority
-              />
-            </div>
           </Link>
         </div>
 
