@@ -215,7 +215,7 @@ export default function TransfersPage() {
                     setFromLocation(val);
                     setDraftItems([]);
                   }}
-                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent bg-surface-2 text-text-primary"
                 >
                   {LOCATIONS.map((l) => (
                     <option key={l} value={l} disabled={l === toLocation}>{l}</option>
@@ -243,7 +243,7 @@ export default function TransfersPage() {
                     setToLocation(val);
                     setDraftItems([]);
                   }}
-                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent bg-surface-2 text-text-primary"
                 >
                   {LOCATIONS.map((l) => (
                     <option key={l} value={l} disabled={l === fromLocation}>{l}</option>
@@ -280,7 +280,7 @@ export default function TransfersPage() {
 
             {/* Search results dropdown */}
             {searchResults.length > 0 && (
-              <div className="mt-1 border border-border-0 rounded-lg shadow-sm divide-y divide-border-0 max-h-64 overflow-y-auto">
+              <div className="mt-1 border border-border-0 divide-y divide-border-0 max-h-64 overflow-y-auto bg-surface-1">
                 {searchResults.map((p) => {
                   const onHandFrom =
                     fromLocation === "In-Store Fitzgerald St"
