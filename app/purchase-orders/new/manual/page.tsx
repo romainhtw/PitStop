@@ -145,7 +145,7 @@ export default function ManualPurchaseOrderPage() {
               <tr className="text-left text-[11px] text-text-tertiary uppercase tracking-widest border-b border-border-0">
                 <th className="py-2 pr-2">Item Name</th>
                 <th className="py-2 pr-2">SKU</th>
-                <th className="py-2 pr-2 w-32">Category</th>
+                <th className="py-2 pr-2 w-32">Collection</th>
                 <th className="py-2 pr-2 w-20">Qty</th>
                 <th className="py-2 pr-2 w-28">Cost (ex GST)</th>
                 <th className="py-2 pr-2 w-28">Retail Price</th>
@@ -163,7 +163,7 @@ export default function ManualPurchaseOrderPage() {
                     <input className={cellCls} value={li.sku} placeholder="Supplier SKU" onChange={(e) => updateItem(idx, { sku: e.target.value })} />
                   </td>
                   <td className="py-1.5 pr-2">
-                    <input list="category-options" className={cellCls} value={li.category} placeholder="Category" onChange={(e) => updateItem(idx, { category: e.target.value })} />
+                    <input list="category-options" className={cellCls} value={li.category} placeholder="Collection" onChange={(e) => updateItem(idx, { category: e.target.value })} />
                   </td>
                   <td className="py-1.5 pr-2">
                     <input type="number" min={0} className={cellCls} value={li.qty} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) || 0 })} />

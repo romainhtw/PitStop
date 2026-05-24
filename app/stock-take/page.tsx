@@ -364,7 +364,7 @@ export default function StockTakePage() {
       {/* ── Category sidebar (desktop) ── */}
       <aside className="hidden lg:flex flex-col w-52 shrink-0 border-r border-border-0 bg-surface-1 overflow-y-auto">
         <div className="px-4 py-3 border-b border-border-0">
-          <p className="text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest mb-2">Categories</p>
+          <p className="text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest mb-2">Collections</p>
           {/* Progress bar — hard rect, no rounded-full */}
           <div className="h-px bg-border-0 overflow-hidden mb-2">
             <div

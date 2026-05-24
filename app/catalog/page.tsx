@@ -334,7 +334,7 @@ export default function CatalogPage() {
             onChange={(e) => setFilterType(e.target.value)}
             className="bg-surface-2 border border-border-1 text-text-primary px-3 py-2 text-sm focus:outline-none focus:border-accent transition-colors"
           >
-            <option value="">All categories</option>
+            <option value="">All collections</option>
             {productTypes.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
@@ -379,7 +379,7 @@ export default function CatalogPage() {
                   </th>
                   <th className="px-4 py-2.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-text-tertiary">Variant</th>
                   <th className="px-4 py-2.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-text-tertiary">SKU</th>
-                  <th className="px-4 py-2.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-text-tertiary">Category</th>
+                  <th className="px-4 py-2.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-text-tertiary">Collection</th>
                   <SortTh col="onHand" label="In Store" />
                   <SortTh col="onHand" label="Whouse" />
                   <SortTh col="unitCost" label="Cost" />

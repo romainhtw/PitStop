@@ -74,7 +74,7 @@ export default function PriceAuditPage() {
           if (!p.barcode) flags.push("Missing barcode");
           if (p.price === 0) flags.push("$0 retail price");
           if (!p.compareAtPrice) flags.push("No compare-at price");
-          if (!p.productType) flags.push("No category");
+          if (!p.productType) flags.push("No collection");
           if (p.unitCost == null) flags.push("No cost price");
           if (flags.length > 0) {
             issues.push({
@@ -236,7 +236,7 @@ export default function PriceAuditPage() {
           <div className="text-center py-24 bg-surface-1 border border-border-0">
             <div className="text-4xl mb-3">✓</div>
             <p className="text-text-primary font-medium">Catalogue is clean</p>
-            <p className="text-text-tertiary text-sm mt-1 font-mono">All products have SKUs, barcodes, prices, and categories.</p>
+            <p className="text-text-tertiary text-sm mt-1 font-mono">All products have SKUs, barcodes, prices, and collections.</p>
           </div>
         ) : (
           <div className="bg-surface-1 border border-border-0 overflow-hidden">
