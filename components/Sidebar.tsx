@@ -170,7 +170,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </button>
           <p className="px-5 pb-1 text-2xs font-mono text-text-tertiary opacity-50">Perth · WA</p>
           {/* Arc Labs credit */}
-          <div className="px-5 pb-3 flex items-center gap-1.5 opacity-30 hover:opacity-50 transition-opacity">
+          <a
+            href="https://www.arc-labs.com.au"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 pb-3 flex items-center gap-1.5 opacity-30 hover:opacity-60 transition-opacity"
+          >
             {/* Cocarde / rosette — pink, 8-petal */}
             <svg width="10" height="10" viewBox="0 0 20 20" fill="#FF69B4" xmlns="http://www.w3.org/2000/svg">
               <ellipse cx="10" cy="5.5" rx="2" ry="3.5"/>
@@ -184,7 +189,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               <circle cx="10" cy="10" r="2.5"/>
             </svg>
             <span className="text-2xs font-mono text-text-tertiary">built by Arc Labs</span>
-          </div>
+          </a>
         </div>
       </aside>
     </>
