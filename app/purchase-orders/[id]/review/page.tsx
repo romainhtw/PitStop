@@ -235,8 +235,8 @@ export default function ReviewPurchaseOrderPage() {
     [lineItems]
   );
   const shipping = Number(shippingCost) || 0;
-  // GST applies to GST-applicable goods only — freight is not always GST-rated on supplier invoices
-  const gst = gstableItemsTotal * 0.1;
+  // In Australia, domestic freight is GST-applicable — include shipping in GST base
+  const gst = (gstableItemsTotal + shipping) * 0.1;
   const total = subtotal + shipping + gst;
 
   // Bulk sync warning — >50 visible items risk a timeout
@@ -783,7 +783,7 @@ export default function ReviewPurchaseOrderPage() {
               <span>${subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-text-secondary">
-              <span>GST (10%)</span>
+              <span>GST (10% incl. freight)</span>
               <span>${gst.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center text-text-secondary">
