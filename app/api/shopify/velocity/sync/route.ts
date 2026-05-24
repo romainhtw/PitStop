@@ -113,6 +113,8 @@ export async function POST() {
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
       const batch = adminDb.batch();
       for (const [sku, data] of entries.slice(i, i + BATCH_SIZE)) {
+        // Firestore doc IDs cannot contain '/' — replace with '__'
+        const docId = sku.replace(/\//g, "__");
         const entry: VelocityEntry = {
           sku,
           variantId: data.variantId,
@@ -121,7 +123,7 @@ export async function POST() {
           velocityPerDay: parseFloat((data.units / windowDays).toFixed(4)),
           lastSyncedAt: now,
         };
-        batch.set(adminDb.collection("velocityCache").doc(sku), entry);
+        batch.set(adminDb.collection("velocityCache").doc(docId), entry);
       }
       await batch.commit();
     }
