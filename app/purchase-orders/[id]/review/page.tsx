@@ -16,10 +16,10 @@ interface CreateFormFields {
 }
 
 function confidenceTier(score?: number): { label: string; className: string } {
-  if (score === undefined) return { label: "Unknown", className: "text-gray-400 bg-gray-100" };
+  if (score === undefined) return { label: "Unknown", className: "text-text-tertiary bg-surface-2" };
   if (score >= 80) return { label: "Strong", className: "text-emerald-700 bg-emerald-50" };
   if (score >= 60) return { label: "Possible", className: "text-amber-700 bg-amber-100" };
-  return { label: "Weak", className: "text-gray-500 bg-gray-100" };
+  return { label: "Weak", className: "text-text-secondary bg-surface-2" };
 }
 
 function ConfidenceBadge({ score }: { score?: number }) {
@@ -45,38 +45,38 @@ function CreateProductForm({
   onSubmit: () => void;
   onCancel: () => void;
 }) {
-  const fieldCls = "w-full rounded border border-amber-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green/40 focus:border-brand-green";
+  const fieldCls = "w-full rounded border border-amber-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent";
   return (
-    <div className="mt-2 bg-white border border-amber-200 rounded-lg p-3 space-y-2">
-      <p className="text-[10px] font-bold text-brand-green uppercase tracking-widest mb-1">New Shopify product</p>
+    <div className="mt-2 bg-surface-1 border border-amber-200 rounded-lg p-3 space-y-2">
+      <p className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">New Shopify product</p>
       <div>
-        <label className="text-[10px] text-gray-500 mb-0.5 block">Title *</label>
+        <label className="text-[10px] text-text-secondary mb-0.5 block">Title *</label>
         <input className={fieldCls} value={form?.title ?? ""} onChange={(e) => onChange({ title: e.target.value })} />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-[10px] text-gray-500 mb-0.5 block">SKU</label>
+          <label className="text-[10px] text-text-secondary mb-0.5 block">SKU</label>
           <input className={fieldCls} value={form?.sku ?? ""} onChange={(e) => onChange({ sku: e.target.value })} />
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 mb-0.5 block">Barcode</label>
+          <label className="text-[10px] text-text-secondary mb-0.5 block">Barcode</label>
           <input className={fieldCls} value={form?.barcode ?? ""} onChange={(e) => onChange({ barcode: e.target.value })} />
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 mb-0.5 block">Retail Price ($)</label>
+          <label className="text-[10px] text-text-secondary mb-0.5 block">Retail Price ($)</label>
           <input type="number" step="0.01" min={0} className={fieldCls} value={form?.price ?? ""} onChange={(e) => onChange({ price: e.target.value })} />
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 mb-0.5 block">Product Type</label>
+          <label className="text-[10px] text-text-secondary mb-0.5 block">Product Type</label>
           <input className={fieldCls} value={form?.productType ?? ""} onChange={(e) => onChange({ productType: e.target.value })} />
         </div>
       </div>
       <div className="flex items-center justify-between pt-1">
-        <button onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Cancel</button>
+        <button onClick={onCancel} className="text-xs text-text-tertiary hover:text-text-secondary transition-colors">Cancel</button>
         <button
           onClick={onSubmit}
           disabled={creating || !form?.title?.trim()}
-          className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green/90 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors"
+          className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-dim disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors"
         >
           {creating ? (
             <>
@@ -465,14 +465,14 @@ export default function ReviewPurchaseOrderPage() {
     }
   };
 
-  const inputCls = "w-full rounded border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/40 focus:border-brand-green";
-  const cellCls = "w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green/40 focus:border-brand-green";
+  const inputCls = "w-full rounded border border-border-1 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent";
+  const cellCls = "w-full rounded border border-border-1 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent";
   const isBusy = submitting || syncing || previewing;
 
   if (!loaded) {
     return (
-      <div className="p-10 flex items-center gap-3 text-gray-400">
-        <div className="w-5 h-5 border-2 border-gray-200 border-t-brand-green rounded-full animate-spin" />
+      <div className="p-10 flex items-center gap-3 text-text-tertiary">
+        <div className="w-5 h-5 border-2 border-border-1 border-t-accent rounded-full animate-spin" />
         Loading purchase order…
       </div>
     );
@@ -486,10 +486,10 @@ export default function ReviewPurchaseOrderPage() {
     <div className={pdfPaneOpen && pdfUrl ? "flex h-screen overflow-hidden" : ""}>
       {/* Split-pane PDF viewer */}
       {pdfPaneOpen && pdfUrl && (
-        <div className="w-1/2 h-full border-r border-gray-200 flex flex-col shrink-0">
-          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Invoice PDF</span>
-            <button onClick={() => setPdfPaneOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+        <div className="w-1/2 h-full border-r border-border-1 flex flex-col shrink-0">
+          <div className="flex items-center justify-between px-4 py-2 bg-surface-1 border-b border-border-1">
+            <span className="text-xs font-semibold text-text-secondary uppercase tracking-widest">Invoice PDF</span>
+            <button onClick={() => setPdfPaneOpen(false)} className="text-text-tertiary hover:text-text-secondary text-lg leading-none">&times;</button>
           </div>
           <iframe src={pdfUrl} className="flex-1 w-full" title="Invoice PDF" />
         </div>
@@ -499,8 +499,8 @@ export default function ReviewPurchaseOrderPage() {
       <div className="mb-4"><BackButton /></div>
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="font-display text-4xl leading-none tracking-wide text-brand-green mb-1">Review Purchase Order</h1>
-          <p className="text-gray-500 text-sm">
+          <h1 className="font-display text-4xl leading-none tracking-wide text-accent mb-1">Review Purchase Order</h1>
+          <p className="text-text-secondary text-sm">
             Check the extracted details, fix anything incorrect, then save or sync directly to Shopify.
           </p>
         </div>
@@ -509,7 +509,7 @@ export default function ReviewPurchaseOrderPage() {
           {pdfUrl && (
             <button
               onClick={() => setPdfPaneOpen((o) => !o)}
-              className={`inline-flex items-center gap-1.5 text-sm border px-3 py-2 rounded transition-colors ${pdfPaneOpen ? "border-brand-green text-brand-green bg-brand-sage/20" : "border-gray-200 text-gray-500 hover:border-brand-green hover:text-brand-green"}`}
+              className={`inline-flex items-center gap-1.5 text-sm border px-3 py-2 rounded transition-colors ${pdfPaneOpen ? "border-accent text-accent bg-surface-2" : "border-border-1 text-text-secondary hover:border-accent hover:text-accent"}`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -521,7 +521,7 @@ export default function ReviewPurchaseOrderPage() {
             href={`/purchase-orders/${params.id}/pdf`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm border border-gray-200 text-gray-500 hover:border-brand-green hover:text-brand-green px-3 py-2 rounded transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm border border-border-1 text-text-secondary hover:border-accent hover:text-accent px-3 py-2 rounded transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -535,7 +535,7 @@ export default function ReviewPurchaseOrderPage() {
               className={`inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded border transition-colors disabled:opacity-60 ${
                 poStatus === "ordered"
                   ? "border-blue-300 text-blue-700 bg-blue-50 cursor-default"
-                  : "border-gray-300 text-gray-600 hover:border-brand-green hover:text-brand-green"
+                  : "border-border-1 text-text-secondary hover:border-accent hover:text-accent"
               }`}
             >
               {poStatus === "ordered" ? "✓ Ordered" : markingOrdered ? "Marking…" : "Mark as Ordered"}
@@ -545,55 +545,55 @@ export default function ReviewPurchaseOrderPage() {
       </div>
 
       {/* Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h2 className="text-xs font-semibold text-gray-400 mb-4 uppercase tracking-wide">Header</h2>
+      <div className="bg-surface-1 border border-border-1 p-6 mb-6">
+        <h2 className="text-xs font-semibold text-text-tertiary mb-4 uppercase tracking-wide">Header</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">Supplier</label>
+            <label className="text-xs text-text-secondary mb-1 block">Supplier</label>
             <input className={inputCls} value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">Invoice #</label>
+            <label className="text-xs text-text-secondary mb-1 block">Invoice #</label>
             <input className={inputCls} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">Invoice Date</label>
+            <label className="text-xs text-text-secondary mb-1 block">Invoice Date</label>
             <input type="date" className={inputCls} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">Order #</label>
+            <label className="text-xs text-text-secondary mb-1 block">Order #</label>
             <input className={inputCls} value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">Location</label>
+            <label className="text-xs text-text-secondary mb-1 block">Location</label>
             <select className={inputCls} value={location} onChange={(e) => setLocation(e.target.value as PurchaseOrder["location"])}>
               <option value="In-Store Fitzgerald St">In-Store Fitzgerald St</option>
               <option value="Warehouse">Warehouse</option>
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">Payment Terms</label>
+            <label className="text-xs text-text-secondary mb-1 block">Payment Terms</label>
             <input className={inputCls} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">
+            <label className="text-xs text-text-secondary mb-1 block">
               Currency
-              <span className="ml-1 text-gray-400 font-normal">(ISO 4217)</span>
+              <span className="ml-1 text-text-tertiary font-normal">(ISO 4217)</span>
             </label>
             <input className={inputCls} value={currency} maxLength={3} placeholder="AUD" onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
           </div>
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">
+            <label className="text-xs text-text-secondary mb-1 block">
               Tax / VAT Number
-              <span className="ml-1 text-gray-400 font-normal">(ABN, GST reg…)</span>
+              <span className="ml-1 text-text-tertiary font-normal">(ABN, GST reg…)</span>
             </label>
             <input className={inputCls} value={taxVatNumber} placeholder="e.g. ABN 12 345 678 901" onChange={(e) => setTaxVatNumber(e.target.value)} />
           </div>
           {currency && currency !== "AUD" && (
             <div>
-              <label className="text-xs text-gray-600 mb-1 block">
+              <label className="text-xs text-text-secondary mb-1 block">
                 Exchange Rate
-                <span className="ml-1 text-gray-400 font-normal">1 {currency} = ? AUD</span>
+                <span className="ml-1 text-text-tertiary font-normal">1 {currency} = ? AUD</span>
               </label>
               <input
                 type="number"
@@ -604,26 +604,26 @@ export default function ReviewPurchaseOrderPage() {
                 placeholder="e.g. 1.52"
                 onChange={(e) => setExchangeRate(Number(e.target.value) || 1)}
               />
-              <p className="text-[11px] text-gray-400 mt-1">Applied to cost prices when syncing to Shopify.</p>
+              <p className="text-[11px] text-text-tertiary mt-1">Applied to cost prices when syncing to Shopify.</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Supplier Notes */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6 overflow-hidden">
+      <div className="bg-surface-1 border border-border-1 mb-6 overflow-hidden">
         <button
           onClick={() => setNotesOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-surface-2 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Supplier Notes</span>
+            <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wide">Supplier Notes</span>
             {supplierNotes && (
-              <span className="text-xs bg-brand-sage text-brand-green px-2 py-0.5 rounded-full font-medium">saved</span>
+              <span className="text-xs bg-surface-2 text-accent px-2 py-0.5 rounded-full font-medium">saved</span>
             )}
           </div>
           <svg
-            className={`w-4 h-4 text-gray-400 transition-transform ${notesOpen ? "rotate-180" : ""}`}
+            className={`w-4 h-4 text-text-tertiary transition-transform ${notesOpen ? "rotate-180" : ""}`}
             viewBox="0 0 20 20" fill="currentColor"
           >
             <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -631,13 +631,13 @@ export default function ReviewPurchaseOrderPage() {
         </button>
         {notesOpen && (
           <div className="px-6 pb-5">
-            <p className="text-xs text-gray-500 mb-2">
+            <p className="text-xs text-text-secondary mb-2">
               Notes about this supplier&apos;s invoices — saved and injected into every future parse from this supplier.
             </p>
             <textarea
               rows={3}
               placeholder={`e.g. "Use Sales amount column for cost price (38% trade discount). SKU is labelled 'Item number'."`}
-              className="w-full rounded border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/40 focus:border-brand-green resize-none"
+              className="w-full rounded border border-border-1 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent resize-none"
               value={supplierNotes}
               onChange={(e) => setSupplierNotes(e.target.value)}
             />
@@ -646,19 +646,19 @@ export default function ReviewPurchaseOrderPage() {
       </div>
 
       {/* Line Items */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div className="bg-surface-1 border border-border-1 p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Line Items</h2>
+            <h2 className="text-xs font-semibold text-text-tertiary uppercase tracking-wide">Line Items</h2>
             {lineItems.filter((li) => li.hidden).length > 0 && (
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded font-medium">
+              <span className="text-[10px] text-text-tertiary bg-surface-2 px-2 py-0.5 rounded font-medium">
                 {lineItems.filter((li) => li.hidden).length} hidden — won&apos;t sync
               </span>
             )}
           </div>
           <button
             onClick={addRow}
-            className="inline-flex items-center gap-1.5 bg-brand-sage hover:bg-brand-sage/80 text-brand-green text-sm font-medium px-3 py-1.5 rounded transition-colors"
+            className="inline-flex items-center gap-1.5 bg-surface-2 hover:bg-surface-2/80 text-accent text-sm font-medium px-3 py-1.5 rounded transition-colors"
           >
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 4a1 1 0 011 1v4h4a1 1 0 110 2h-4v4a1 1 0 11-2 0v-4H5a1 1 0 110-2h4V5a1 1 0 011-1z" clipRule="evenodd" />
@@ -669,7 +669,7 @@ export default function ReviewPurchaseOrderPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] text-gray-400 uppercase tracking-widest border-b border-gray-100">
+              <tr className="text-left text-[11px] text-text-tertiary uppercase tracking-widest border-b border-border-0">
                 <th className="py-2 pr-2">Item Name</th>
                 <th className="py-2 pr-2">SKU · Barcode</th>
                 <th className="py-2 pr-2 w-32">Category</th>
@@ -683,24 +683,24 @@ export default function ReviewPurchaseOrderPage() {
             <tbody>
               {lineItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={8} className="py-8 text-center text-text-tertiary text-sm">
                     No items yet — click &ldquo;Add Row&rdquo; to start.
                   </td>
                 </tr>
               ) : (
                 lineItems.map((li, idx) => (
-                  <tr key={li.id} className={`border-b border-gray-50 transition-opacity ${li.hidden ? "opacity-40" : ""}`}>
+                  <tr key={li.id} className={`border-b border-border-0 transition-opacity ${li.hidden ? "opacity-40" : ""}`}>
                     {/* Name + option chips */}
                     <td className="py-1.5 pr-2">
                       <input
-                        className={`${cellCls} ${li.hidden ? "line-through text-gray-400" : ""}`}
+                        className={`${cellCls} ${li.hidden ? "line-through text-text-tertiary" : ""}`}
                         value={li.name}
                         onChange={(e) => updateItem(idx, { name: e.target.value })}
                       />
                       {li.optionValues && li.optionValues.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {li.optionValues.map((ov, ovIdx) => (
-                            <span key={ovIdx} className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono leading-none">
+                            <span key={ovIdx} className="text-[10px] bg-surface-2 text-text-secondary px-1.5 py-0.5 rounded font-mono leading-none">
                               {ov.optionName}: {ov.optionValue}
                             </span>
                           ))}
@@ -716,7 +716,7 @@ export default function ReviewPurchaseOrderPage() {
                         onChange={(e) => updateItem(idx, { sku: e.target.value })}
                       />
                       <input
-                        className={`${cellCls} mt-1 text-[11px] text-gray-500`}
+                        className={`${cellCls} mt-1 text-[11px] text-text-secondary`}
                         value={li.barcode || ""}
                         placeholder="Barcode / EAN"
                         onChange={(e) => updateItem(idx, { barcode: e.target.value })}
@@ -734,14 +734,14 @@ export default function ReviewPurchaseOrderPage() {
                     <td className="py-1.5 pr-2"><input type="number" min={0} className={cellCls} value={li.qty} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) || 0 })} /></td>
                     <td className="py-1.5 pr-2"><input type="number" step="0.01" min={0} className={cellCls} value={li.costPrice} onChange={(e) => updateItem(idx, { costPrice: Number(e.target.value) || 0 })} /></td>
                     <td className="py-1.5 pr-2"><input type="number" step="0.01" min={0} className={cellCls} value={li.retailPrice} onChange={(e) => updateItem(idx, { retailPrice: Number(e.target.value) || 0 })} /></td>
-                    <td className="py-1.5 pr-2 text-center"><input type="checkbox" checked={li.gstApplicable} onChange={(e) => updateItem(idx, { gstApplicable: e.target.checked })} className="w-4 h-4 accent-brand-green" /></td>
+                    <td className="py-1.5 pr-2 text-center"><input type="checkbox" checked={li.gstApplicable} onChange={(e) => updateItem(idx, { gstApplicable: e.target.checked })} className="w-4 h-4 accent-[#FF5A00]" /></td>
                     {/* Hide + Delete */}
                     <td className="py-1.5">
                       <div className="flex items-center gap-0.5 justify-center">
                         <button
                           onClick={() => updateItem(idx, { hidden: !li.hidden })}
                           title={li.hidden ? "Show — will sync to Shopify" : "Hide — won't sync to Shopify"}
-                          className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${li.hidden ? "text-amber-500 hover:text-brand-green bg-amber-50" : "text-gray-300 hover:text-gray-500"}`}
+                          className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${li.hidden ? "text-amber-500 hover:text-accent bg-amber-50" : "text-text-tertiary hover:text-text-tertiary"}`}
                           aria-label={li.hidden ? "Show item" : "Hide item"}
                         >
                           {li.hidden ? (
@@ -757,7 +757,7 @@ export default function ReviewPurchaseOrderPage() {
                         </button>
                         <button
                           onClick={() => removeRow(idx)}
-                          className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-red-500 text-xl leading-none rounded transition-colors"
+                          className="w-7 h-7 flex items-center justify-center text-text-tertiary hover:text-red-500 text-xl leading-none rounded transition-colors"
                           aria-label="Remove row"
                         >&times;</button>
                       </div>
@@ -775,26 +775,26 @@ export default function ReviewPurchaseOrderPage() {
       </datalist>
 
       {/* Totals */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div className="bg-surface-1 border border-border-1 p-6 mb-6">
         <div className="flex justify-end">
           <div className="w-80 space-y-2 text-sm">
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-text-secondary">
               <span>Subtotal (ex GST)</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-text-secondary">
               <span>GST (10%)</span>
               <span>${gst.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center text-gray-600">
+            <div className="flex justify-between items-center text-text-secondary">
               <span>Shipping</span>
               <input
                 type="number" step="0.01" min={0} value={shippingCost}
                 onChange={(e) => setShippingCost(Number(e.target.value) || 0)}
-                className="w-28 rounded border border-gray-200 px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-brand-green/40 focus:border-brand-green"
+                className="w-28 rounded border border-border-1 px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
               />
             </div>
-            <div className="flex justify-between text-base font-semibold text-brand-green border-t border-gray-100 pt-2">
+            <div className="flex justify-between text-base font-semibold text-accent border-t border-border-0 pt-2">
               <span>Total (calculated)</span>
               <span>${total.toFixed(2)}</span>
             </div>
@@ -845,7 +845,7 @@ export default function ReviewPurchaseOrderPage() {
           <button
             onClick={handleSave}
             disabled={isBusy}
-            className="border border-brand-green text-brand-green hover:bg-brand-sage/30 disabled:opacity-50 text-sm font-medium px-5 py-2.5 rounded transition-colors"
+            className="border border-accent text-accent hover:bg-surface-2 disabled:opacity-50 text-sm font-medium px-5 py-2.5 rounded transition-colors"
           >
             {submitting ? "Saving…" : "Save"}
           </button>
@@ -857,7 +857,7 @@ export default function ReviewPurchaseOrderPage() {
             <button
               onClick={handlePreview}
               disabled={isBusy || mathDiscrepancy}
-              className="inline-flex items-center gap-2 bg-brand-green hover:bg-brand-green/90 disabled:opacity-50 text-white text-sm font-medium px-6 py-2.5 rounded transition-colors"
+              className="inline-flex items-center gap-2 bg-accent hover:bg-accent-dim disabled:opacity-50 text-white text-sm font-medium px-6 py-2.5 rounded transition-colors"
             >
               {previewing ? (
                 <>
@@ -916,17 +916,17 @@ export default function ReviewPurchaseOrderPage() {
               </div>
             );
           })()}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-5">
+          <div className="bg-surface-1 border border-border-1 overflow-hidden mb-5">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left bg-white border-b border-gray-200">
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Item</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">SKU</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Shopify Product</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">In Stock</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Qty to Add</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Landed Cost</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Status</th>
+                <tr className="text-left bg-surface-1 border-b border-border-1">
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Item</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">SKU</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Shopify Product</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">In Stock</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Qty to Add</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Landed Cost</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -942,8 +942,8 @@ export default function ReviewPurchaseOrderPage() {
                           {/* Left: invoice product */}
                           <td colSpan={2} className="px-4 py-3 align-top border-r border-amber-100 bg-amber-50/30 w-64">
                             <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">From invoice</p>
-                            <p className="text-sm font-semibold text-gray-800 leading-tight">{r.name}</p>
-                            <p className="text-xs text-gray-400 font-mono mt-0.5">{r.sku || "No SKU"}</p>
+                            <p className="text-sm font-semibold text-text-primary leading-tight">{r.name}</p>
+                            <p className="text-xs text-text-tertiary font-mono mt-0.5">{r.sku || "No SKU"}</p>
                           </td>
                           {/* Right: suggestions or manual search */}
                           <td colSpan={3} className="px-4 py-3 align-top bg-amber-50/10">
@@ -964,12 +964,12 @@ export default function ReviewPurchaseOrderPage() {
                                           },
                                         }))
                                       }
-                                      className="w-full flex items-center justify-between gap-3 bg-white hover:bg-brand-sage/30 rounded-lg px-3 py-2.5 border border-amber-200 hover:border-brand-green transition-all text-left group"
+                                      className="w-full flex items-center justify-between gap-3 bg-surface-1 hover:bg-surface-2 rounded-lg px-3 py-2.5 border border-amber-200 hover:border-accent transition-all text-left group"
                                     >
                                       <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-green transition-colors truncate">{s.productTitle}</p>
+                                        <p className="text-sm font-semibold text-text-primary group-hover:text-accent transition-colors truncate">{s.productTitle}</p>
                                         {(s.sku || s.barcode) && (
-                                          <p className="text-xs text-gray-400 mt-0.5">
+                                          <p className="text-xs text-text-tertiary mt-0.5">
                                             {s.sku && `SKU: ${s.sku}`}
                                             {s.sku && s.barcode && " · "}
                                             {s.barcode && `Barcode: ${s.barcode}`}
@@ -977,7 +977,7 @@ export default function ReviewPurchaseOrderPage() {
                                         )}
                                       </div>
                                       <ConfidenceBadge score={s.score} />
-                                      <span className="shrink-0 bg-brand-green group-hover:bg-brand-green/90 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap">
+                                      <span className="shrink-0 bg-accent group-hover:bg-accent-dim text-white text-xs font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap">
                                         Match →
                                       </span>
                                     </button>
@@ -985,7 +985,7 @@ export default function ReviewPurchaseOrderPage() {
                                 </div>
                                 <button
                                   onClick={() => setShowSearchFor((prev) => ({ ...prev, [r.lineItemId]: true }))}
-                                  className="mt-2.5 text-xs text-gray-400 hover:text-brand-green underline transition-colors"
+                                  className="mt-2.5 text-xs text-text-tertiary hover:text-accent underline transition-colors"
                                 >
                                   Not the right match? Search instead
                                 </button>
@@ -996,7 +996,7 @@ export default function ReviewPurchaseOrderPage() {
                                   <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Search Shopify</p>
                                   <button
                                     onClick={() => setShowSearchFor((prev) => ({ ...prev, [r.lineItemId]: false }))}
-                                    className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                                    className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
                                   >
                                     ← Back to suggestions
                                   </button>
@@ -1008,12 +1008,12 @@ export default function ReviewPurchaseOrderPage() {
                                     value={manualSearchQueries[r.lineItemId] ?? ""}
                                     onChange={(e) => setManualSearchQueries((prev) => ({ ...prev, [r.lineItemId]: e.target.value }))}
                                     onKeyDown={(e) => e.key === "Enter" && handleManualSearch(r.lineItemId)}
-                                    className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green/40 focus:border-brand-green"
+                                    className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
                                   />
                                   <button
                                     onClick={() => handleManualSearch(r.lineItemId)}
                                     disabled={manualSearching[r.lineItemId]}
-                                    className="inline-flex items-center gap-1 bg-brand-green hover:bg-brand-green/90 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors whitespace-nowrap"
+                                    className="inline-flex items-center gap-1 bg-accent hover:bg-accent-dim disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors whitespace-nowrap"
                                   >
                                     {manualSearching[r.lineItemId] ? (
                                       <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -1033,18 +1033,18 @@ export default function ReviewPurchaseOrderPage() {
                                           <button
                                             key={s.variantId}
                                             onClick={() => setConfirmedMappings((prev) => ({ ...prev, [r.lineItemId]: { variantId: s.variantId, inventoryItemId: s.inventoryItemId, productTitle: s.productTitle } }))}
-                                            className="w-full flex items-center justify-between gap-3 bg-white hover:bg-brand-sage/30 rounded-lg px-3 py-2.5 border border-amber-200 hover:border-brand-green transition-all text-left group"
+                                            className="w-full flex items-center justify-between gap-3 bg-surface-1 hover:bg-surface-2 rounded-lg px-3 py-2.5 border border-amber-200 hover:border-accent transition-all text-left group"
                                           >
                                             <div className="min-w-0 flex-1">
-                                              <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-green transition-colors truncate">{s.productTitle}</p>
+                                              <p className="text-sm font-semibold text-text-primary group-hover:text-accent transition-colors truncate">{s.productTitle}</p>
                                               {(s.sku || s.barcode) && (
-                                                <p className="text-xs text-gray-400 mt-0.5">
+                                                <p className="text-xs text-text-tertiary mt-0.5">
                                                   {s.sku && `SKU: ${s.sku}`}{s.sku && s.barcode && " · "}{s.barcode && `Barcode: ${s.barcode}`}
                                                 </p>
                                               )}
                                             </div>
                                             <ConfidenceBadge score={s.score} />
-                                            <span className="shrink-0 bg-brand-green group-hover:bg-brand-green/90 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap">Match →</span>
+                                            <span className="shrink-0 bg-accent group-hover:bg-accent-dim text-white text-xs font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap">Match →</span>
                                           </button>
                                         ))}
                                       </div>
@@ -1052,7 +1052,7 @@ export default function ReviewPurchaseOrderPage() {
                                     {!showCreateFor[r.lineItemId] ? (
                                       <button
                                         onClick={() => openCreateForm(r.lineItemId, r.name, r.sku || "", lineItem?.retailPrice ?? 0, lineItem?.category ?? "")}
-                                        className="inline-flex items-center gap-1 text-xs text-brand-green hover:underline font-medium"
+                                        className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium"
                                       >
                                         + Create new product in Shopify
                                       </button>
@@ -1078,25 +1078,25 @@ export default function ReviewPurchaseOrderPage() {
                         </tr>
                       ) : (
                         /* ── All other rows: standard layout ── */
-                        <tr className={`border-b border-gray-50 ${isConfirmed ? "bg-emerald-50/30" : ""}`}>
-                          <td className="px-4 py-3 text-gray-700">{r.name}</td>
-                          <td className="px-4 py-3 text-gray-500 font-mono text-xs">{r.sku || "—"}</td>
-                          <td className="px-4 py-3 text-gray-600">
+                        <tr className={`border-b border-border-0 ${isConfirmed ? "bg-emerald-50/30" : ""}`}>
+                          <td className="px-4 py-3 text-text-primary">{r.name}</td>
+                          <td className="px-4 py-3 text-text-secondary font-mono text-xs">{r.sku || "—"}</td>
+                          <td className="px-4 py-3 text-text-secondary">
                             {isConfirmed ? confirmed.productTitle : (r.shopifyProductTitle || "—")}
                           </td>
-                          <td className="px-4 py-3 text-gray-500">
+                          <td className="px-4 py-3 text-text-secondary">
                             {r.currentQty != null ? (
-                              <span className={r.currentQty <= 0 ? "text-red-500 font-medium" : r.currentQty <= 3 ? "text-amber-600 font-medium" : "text-gray-600"}>
+                              <span className={r.currentQty <= 0 ? "text-red-500 font-medium" : r.currentQty <= 3 ? "text-amber-600 font-medium" : "text-text-secondary"}>
                                 {r.currentQty}
                               </span>
                             ) : "—"}
                           </td>
-                          <td className="px-4 py-3 text-gray-700">
+                          <td className="px-4 py-3 text-text-primary">
                             {isConfirmed
                               ? `+${lineItem?.qty ?? r.delta ?? "?"}`
                               : r.delta != null ? `+${r.delta}` : "—"}
                           </td>
-                          <td className="px-4 py-3 text-gray-500 text-xs">
+                          <td className="px-4 py-3 text-text-secondary text-xs">
                             {(() => {
                               const lc = liveLandedCosts.get(r.lineItemId) ?? r.landedCost;
                               return lc ? `$${lc.toFixed(2)}` : "—";
@@ -1127,15 +1127,15 @@ export default function ReviewPurchaseOrderPage() {
                       )}
                       {/* Untracked inventory warning */}
                       {r.untrackedInventory && (
-                        <tr className="border-b border-gray-50 bg-gray-50/60">
-                          <td colSpan={7} className="px-4 py-1.5 text-xs text-gray-500">
+                        <tr className="border-b border-border-0 bg-surface-1/60">
+                          <td colSpan={7} className="px-4 py-1.5 text-xs text-text-secondary">
                             ℹ️ Inventory not tracked in Shopify — quantity will not be updated for this item.
                           </td>
                         </tr>
                       )}
                       {/* Missing field hint for synced items */}
                       {r.status === "synced" && r.shopifyMissingFields && r.shopifyMissingFields.length > 0 && (
-                        <tr className="border-b border-gray-50 bg-blue-50/40">
+                        <tr className="border-b border-border-0 bg-blue-50/40">
                           <td colSpan={7} className="px-4 py-2">
                             <p className="text-xs text-blue-700">
                               💡 Matched but Shopify product is missing:{" "}
@@ -1155,8 +1155,8 @@ export default function ReviewPurchaseOrderPage() {
                         <tr className="border-b border-amber-100">
                           <td colSpan={2} className="px-4 py-3 align-top border-r border-amber-100 bg-amber-50/30 w-64">
                             <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">From invoice</p>
-                            <p className="text-sm font-semibold text-gray-800 leading-tight">{r.name}</p>
-                            <p className="text-xs text-gray-400 font-mono mt-0.5">{r.sku || "No SKU"}</p>
+                            <p className="text-sm font-semibold text-text-primary leading-tight">{r.name}</p>
+                            <p className="text-xs text-text-tertiary font-mono mt-0.5">{r.sku || "No SKU"}</p>
                           </td>
                           <td colSpan={3} className="px-4 py-3 align-top bg-amber-50/10">
                             <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2">Search Shopify manually</p>
@@ -1167,12 +1167,12 @@ export default function ReviewPurchaseOrderPage() {
                                 value={manualSearchQueries[r.lineItemId] ?? ""}
                                 onChange={(e) => setManualSearchQueries((prev) => ({ ...prev, [r.lineItemId]: e.target.value }))}
                                 onKeyDown={(e) => e.key === "Enter" && handleManualSearch(r.lineItemId)}
-                                className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green/40 focus:border-brand-green"
+                                className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
                               />
                               <button
                                 onClick={() => handleManualSearch(r.lineItemId)}
                                 disabled={manualSearching[r.lineItemId]}
-                                className="inline-flex items-center gap-1 bg-brand-green hover:bg-brand-green/90 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors whitespace-nowrap"
+                                className="inline-flex items-center gap-1 bg-accent hover:bg-accent-dim disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors whitespace-nowrap"
                               >
                                 {manualSearching[r.lineItemId] ? (
                                   <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -1192,17 +1192,17 @@ export default function ReviewPurchaseOrderPage() {
                                       <button
                                         key={s.variantId}
                                         onClick={() => setConfirmedMappings((prev) => ({ ...prev, [r.lineItemId]: { variantId: s.variantId, inventoryItemId: s.inventoryItemId, productTitle: s.productTitle } }))}
-                                        className="w-full flex items-center justify-between gap-3 bg-white hover:bg-brand-sage/30 rounded-lg px-3 py-2.5 border border-amber-200 hover:border-brand-green transition-all text-left group"
+                                        className="w-full flex items-center justify-between gap-3 bg-surface-1 hover:bg-surface-2 rounded-lg px-3 py-2.5 border border-amber-200 hover:border-accent transition-all text-left group"
                                       >
                                         <div className="min-w-0">
-                                          <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-green transition-colors truncate">{s.productTitle}</p>
+                                          <p className="text-sm font-semibold text-text-primary group-hover:text-accent transition-colors truncate">{s.productTitle}</p>
                                           {(s.sku || s.barcode) && (
-                                            <p className="text-xs text-gray-400 mt-0.5">
+                                            <p className="text-xs text-text-tertiary mt-0.5">
                                               {s.sku && `SKU: ${s.sku}`}{s.sku && s.barcode && " · "}{s.barcode && `Barcode: ${s.barcode}`}
                                             </p>
                                           )}
                                       </div>
-                                      <span className="shrink-0 bg-brand-green group-hover:bg-brand-green/90 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap">Match →</span>
+                                      <span className="shrink-0 bg-accent group-hover:bg-accent-dim text-white text-xs font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap">Match →</span>
                                     </button>
                                   ))}
                                   </div>
@@ -1210,7 +1210,7 @@ export default function ReviewPurchaseOrderPage() {
                                 {!showCreateFor[r.lineItemId] ? (
                                   <button
                                     onClick={() => openCreateForm(r.lineItemId, r.name, r.sku || "", lineItem?.retailPrice ?? 0, lineItem?.category ?? "")}
-                                    className="inline-flex items-center gap-1 text-xs text-brand-green hover:underline font-medium"
+                                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-medium"
                                   >
                                     + Create new product in Shopify
                                   </button>
@@ -1287,14 +1287,14 @@ export default function ReviewPurchaseOrderPage() {
             <button
               onClick={() => { setPreviewResult(null); setConfirmedMappings({}); }}
               disabled={syncing}
-              className="border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-5 py-2.5 rounded transition-colors"
+              className="border border-border-1 text-text-secondary hover:bg-surface-2 disabled:opacity-50 text-sm font-medium px-5 py-2.5 rounded transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirmSync}
               disabled={syncing || poStatus === "approved"}
-              className="inline-flex items-center gap-2 bg-brand-green hover:bg-brand-green/90 disabled:opacity-50 text-white text-sm font-medium px-6 py-2.5 rounded transition-colors"
+              className="inline-flex items-center gap-2 bg-accent hover:bg-accent-dim disabled:opacity-50 text-white text-sm font-medium px-6 py-2.5 rounded transition-colors"
             >
               {syncing ? (
                 <>
@@ -1331,37 +1331,37 @@ export default function ReviewPurchaseOrderPage() {
             </div>
             <button
               onClick={() => setSyncResult(null)}
-              className="text-sm text-gray-500 hover:text-brand-green border border-gray-200 hover:border-brand-green px-3 py-1.5 rounded transition-colors"
+              className="text-sm text-text-secondary hover:text-accent border border-border-1 hover:border-accent px-3 py-1.5 rounded transition-colors"
             >
               ← Back to edit
             </button>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+          <div className="bg-surface-1 border border-border-1 overflow-hidden mb-6">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left bg-white border-b border-gray-200">
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Item</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">SKU / Barcode</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Shopify Product</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">In Stock</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Qty Added</th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Status</th>
+                <tr className="text-left bg-surface-1 border-b border-border-1">
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Item</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">SKU / Barcode</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Shopify Product</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">In Stock</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Qty Added</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {syncResult.results.map((r) => (
-                  <tr key={r.lineItemId} className="border-b border-gray-50 last:border-0">
-                    <td className="px-4 py-3 text-gray-700">{r.name}</td>
-                    <td className="px-4 py-3 text-gray-500 font-mono text-xs">{r.sku || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.shopifyProductTitle || "—"}</td>
+                  <tr key={r.lineItemId} className="border-b border-border-0 last:border-0">
+                    <td className="px-4 py-3 text-text-primary">{r.name}</td>
+                    <td className="px-4 py-3 text-text-secondary font-mono text-xs">{r.sku || "—"}</td>
+                    <td className="px-4 py-3 text-text-secondary">{r.shopifyProductTitle || "—"}</td>
                     <td className="px-4 py-3">
                       {r.currentQty != null ? (
-                        <span className={r.currentQty <= 0 ? "text-red-500 font-medium" : r.currentQty <= 3 ? "text-amber-600 font-medium" : "text-gray-600"}>
+                        <span className={r.currentQty <= 0 ? "text-red-500 font-medium" : r.currentQty <= 3 ? "text-amber-600 font-medium" : "text-text-secondary"}>
                           {r.currentQty}
                         </span>
                       ) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{r.delta != null ? `+${r.delta}` : "—"}</td>
+                    <td className="px-4 py-3 text-text-primary">{r.delta != null ? `+${r.delta}` : "—"}</td>
                     <td className="px-4 py-3">
                       {r.status === "synced" && (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full" title={r.matchedFromCache ? "Matched from saved mapping" : undefined}>
@@ -1383,7 +1383,7 @@ export default function ReviewPurchaseOrderPage() {
                 href="https://admin.shopify.com/products/new"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-green hover:underline font-medium"
+                className="text-accent hover:underline font-medium"
               >
                 Create those products in Shopify →
               </a>{" "}
@@ -1391,7 +1391,7 @@ export default function ReviewPurchaseOrderPage() {
             </p>
           )}
           <div className="flex justify-end">
-            <button onClick={() => router.push("/dashboard")} className="bg-brand-green hover:bg-brand-green/90 text-white text-sm font-medium px-6 py-2.5 rounded transition-colors">
+            <button onClick={() => router.push("/dashboard")} className="bg-accent hover:bg-accent-dim text-white text-sm font-medium px-6 py-2.5 rounded transition-colors">
               Go to Dashboard
             </button>
           </div>
