@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
+    "@upstash/redis": "^1.38.0",
     "@vercel/functions": "^3.6.0",
     "@zxing/browser": "^0.2.0",
     "@zxing/library": "^0.22.0",
+    "bcrypt": "^6.0.0",
     "dexie": "^4.4.2",
     "firebase": "^12.13.0",
     "firebase-admin": "^13.10.0",
@@ -25,6 +27,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
