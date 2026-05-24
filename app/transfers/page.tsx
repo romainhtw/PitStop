@@ -215,8 +215,8 @@ export default function TransfersPage() {
                     setFromLocation(val);
                     setDraftItems([]);
                   }}
-                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent text-text-primary appearance-none"
-                  style={{ backgroundColor: "var(--ps-surface-2)", color: "var(--ps-text-primary)" }}
+                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  style={{ color: "#000" }}
                 >
                   {LOCATIONS.map((l) => (
                     <option key={l} value={l} disabled={l === toLocation}>{l}</option>
@@ -244,8 +244,8 @@ export default function TransfersPage() {
                     setToLocation(val);
                     setDraftItems([]);
                   }}
-                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent text-text-primary appearance-none"
-                  style={{ backgroundColor: "var(--ps-surface-2)", color: "var(--ps-text-primary)" }}
+                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  style={{ color: "#000" }}
                 >
                   {LOCATIONS.map((l) => (
                     <option key={l} value={l} disabled={l === fromLocation}>{l}</option>
