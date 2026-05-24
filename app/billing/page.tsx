@@ -74,7 +74,7 @@ const STATUS_COLOR: Record<string, string> = {
   past_due: "text-amber-700 bg-amber-50 border-amber-200",
   canceled: "text-red-700 bg-red-50 border-red-200",
   unpaid: "text-red-700 bg-red-50 border-red-200",
-  paused: "text-gray-600 bg-gray-100 border-gray-200",
+  paused: "text-text-secondary bg-surface-2 border-border-1",
 };
 
 function fmt(iso: string) {
@@ -91,29 +91,29 @@ function QuotaMeter({ used, quota, freeRemaining, isOverage }: {
     ? "bg-red-500"
     : pct >= 80
     ? "bg-amber-400"
-    : "bg-brand-green";
+    : "bg-accent";
 
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1.5">
-        <span className="text-gray-500">Invoices this period</span>
-        <span className={`font-semibold ${isOverage ? "text-red-600" : "text-gray-700"}`}>
+        <span className="text-text-secondary">Invoices this period</span>
+        <span className={`font-semibold ${isOverage ? "text-red-600" : "text-text-secondary"}`}>
           {used} / {quota}
           {isOverage && <span className="ml-1 text-red-500">(+{used - quota} overage @ $0.99 each)</span>}
         </span>
       </div>
-      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-2 w-full bg-surface-2 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${barColor}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="flex items-center justify-between mt-1.5 text-[11px] text-gray-400">
+      <div className="flex items-center justify-between mt-1.5 text-[11px] text-text-tertiary">
         <span>{used} used</span>
         <span>{Math.max(0, quota - used)} remaining</span>
       </div>
       {freeRemaining > 0 && (
-        <div className="mt-2 text-[11px] text-brand-green font-medium">
+        <div className="mt-2 text-[11px] text-accent font-medium">
           + {freeRemaining} free invoice{freeRemaining !== 1 ? "s" : ""} from referral bonus
         </div>
       )}
@@ -220,8 +220,8 @@ function BillingContent() {
 
   if (loading) {
     return (
-      <div className="p-10 flex items-center gap-3 text-gray-400 justify-center">
-        <div className="w-5 h-5 border-2 border-gray-200 border-t-brand-green rounded-full animate-spin" />
+      <div className="p-10 flex items-center gap-3 text-text-tertiary justify-center">
+        <div className="w-5 h-5 border-2 border-border-1 border-t-accent rounded-full animate-spin" />
         Loading billing…
       </div>
     );
@@ -232,8 +232,8 @@ function BillingContent() {
 
       {/* Header */}
       <div>
-        <h1 className="font-display text-4xl leading-none tracking-wide text-brand-green mb-1">Billing</h1>
-        <p className="text-gray-500 text-sm">Manage your PitStop subscription and referrals.</p>
+        <h1 className="font-display text-4xl leading-none tracking-wide text-accent mb-1">Billing</h1>
+        <p className="text-text-secondary text-sm">Manage your PitStop subscription and referrals.</p>
       </div>
 
       {/* Flash banners */}
@@ -253,13 +253,13 @@ function BillingContent() {
 
       {/* ── CURRENT PLAN CARD ──────────────────────────────────────────── */}
       {isActive && status && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+        <div className="bg-surface-1 border border-border-1 overflow-hidden">
+          <div className="px-6 py-5 border-b border-border-0 flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div>
-                <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Current plan</p>
+                <p className="text-[11px] text-text-tertiary uppercase tracking-widest font-semibold mb-0.5">Current plan</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-lg font-semibold text-gray-900">{status.planName}</p>
+                  <p className="text-lg font-semibold text-text-primary">{status.planName}</p>
                   {status.isFounder && (
                     <span className="text-[10px] font-bold uppercase tracking-widest bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
                       Founder
@@ -267,17 +267,17 @@ function BillingContent() {
                   )}
                 </div>
               </div>
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${STATUS_COLOR[status.status ?? ""] ?? "text-gray-600 bg-gray-100 border-gray-200"}`}>
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${STATUS_COLOR[status.status ?? ""] ?? "text-text-secondary bg-surface-2 border-border-1"}`}>
                 {STATUS_LABEL[status.status ?? ""] ?? status.status}
               </span>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-brand-green">
+              <p className="text-2xl font-bold text-accent">
                 ${((status.effectivePriceCents ?? status.planPriceCents ?? 0) / 100).toFixed(0)}
-                <span className="text-sm font-normal text-gray-400">/mo</span>
+                <span className="text-sm font-normal text-text-tertiary">/mo</span>
               </p>
               {status.isFounder && status.planPriceCents && status.founderLockedPrice && (
-                <p className="text-xs text-gray-400 line-through">
+                <p className="text-xs text-text-tertiary line-through">
                   ${(status.planPriceCents / 100).toFixed(0)}/mo
                 </p>
               )}
@@ -295,9 +295,9 @@ function BillingContent() {
 
             {/* Renewal */}
             {status.currentPeriodEnd && (
-              <div className="flex items-center justify-between text-sm text-gray-500">
+              <div className="flex items-center justify-between text-sm text-text-secondary">
                 <span>Next renewal</span>
-                <span className="font-medium text-gray-800">{fmt(status.currentPeriodEnd)}</span>
+                <span className="font-medium text-text-primary">{fmt(status.currentPeriodEnd)}</span>
               </div>
             )}
 
@@ -315,19 +315,19 @@ function BillingContent() {
 
             {/* Referred by */}
             {status.referredBy && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-text-tertiary">
                 Referred by <span className="font-mono font-medium">{status.referredBy}</span>
               </p>
             )}
           </div>
 
-          <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/60 flex justify-end">
+          <div className="px-6 py-4 border-t border-border-0 bg-surface-2 flex justify-end">
             <button
               onClick={handleManage}
               disabled={actionLoading}
-              className="inline-flex items-center gap-2 text-sm font-medium border border-gray-200 text-gray-600 hover:border-brand-green hover:text-brand-green px-4 py-2 rounded transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 text-sm font-medium border border-border-1 text-text-secondary hover:border-accent hover:text-accent px-4 py-2 rounded transition-colors disabled:opacity-50"
             >
-              {actionLoading && <span className="w-4 h-4 border-2 border-gray-300 border-t-brand-green rounded-full animate-spin" />}
+              {actionLoading && <span className="w-4 h-4 border-2 border-border-1 border-t-accent rounded-full animate-spin" />}
               Manage subscription →
             </button>
           </div>
@@ -337,7 +337,7 @@ function BillingContent() {
       {/* ── PLAN PICKER (no active subscription) ──────────────────────── */}
       {!isActive && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Choose a plan</h2>
+          <h2 className="text-sm font-semibold text-text-secondary mb-4">Choose a plan</h2>
 
           {/* Referral code input */}
           <div className="mb-6 flex items-center gap-2">
@@ -346,7 +346,7 @@ function BillingContent() {
               value={referralInput}
               onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
               placeholder="Have a referral code? Enter it here (e.g. PITSTOP-ELITE)"
-              className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-brand-green"
+              className="flex-1 border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent bg-surface-2 text-text-primary placeholder:text-text-tertiary"
             />
           </div>
 
@@ -356,28 +356,28 @@ function BillingContent() {
                 key={p.id}
                 onClick={() => !actionLoading && handleSubscribe(p.id)}
                 disabled={actionLoading}
-                className={`relative text-left rounded-xl border-2 p-5 transition-all ${
+                className={`relative text-left border-2 p-5 transition-all ${
                   p.recommended
-                    ? "border-brand-green bg-brand-sage/10"
-                    : "border-gray-200 hover:border-brand-green/50"
+                    ? "border-accent bg-surface-2"
+                    : "border-border-1 hover:border-accent/50"
                 } disabled:opacity-60`}
               >
                 {p.recommended && (
-                  <span className="absolute -top-3 left-4 text-[10px] font-bold uppercase tracking-widest bg-brand-green text-white px-2 py-0.5 rounded-full">
+                  <span className="absolute -top-3 left-4 text-[10px] font-bold uppercase tracking-widest bg-accent text-white px-2 py-0.5 rounded-full">
                     Most popular
                   </span>
                 )}
-                <p className="text-sm font-bold text-gray-900 mb-0.5">{p.name}</p>
-                <p className="text-2xl font-bold text-brand-green mb-1">
-                  ${p.price}<span className="text-sm font-normal text-gray-400">/mo</span>
+                <p className="text-sm font-bold text-text-primary mb-0.5">{p.name}</p>
+                <p className="text-2xl font-bold text-accent mb-1">
+                  ${p.price}<span className="text-sm font-normal text-text-tertiary">/mo</span>
                 </p>
-                <p className="text-xs text-gray-500 mb-3">{p.invoices} invoices/mo included</p>
-                <p className="text-xs text-gray-500">{p.desc}</p>
+                <p className="text-xs text-text-secondary mb-3">{p.invoices} invoices/mo included</p>
+                <p className="text-xs text-text-secondary">{p.desc}</p>
                 <div className="mt-4 text-center">
                   <span className={`inline-block text-xs font-semibold px-4 py-1.5 rounded transition-colors ${
                     p.recommended
-                      ? "bg-brand-green text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-brand-green hover:text-white"
+                      ? "bg-accent text-white"
+                      : "bg-surface-2 text-text-secondary hover:bg-accent hover:text-white"
                   }`}>
                     {actionLoading ? "Loading…" : "Get started →"}
                   </span>
@@ -386,7 +386,7 @@ function BillingContent() {
             ))}
           </div>
 
-          <p className="mt-4 text-xs text-gray-400 text-center">
+          <p className="mt-4 text-xs text-text-tertiary text-center">
             All plans include overage at $0.99/invoice beyond your quota. Cancel anytime. Powered by Stripe.
           </p>
         </div>
@@ -394,10 +394,10 @@ function BillingContent() {
 
       {/* ── REFERRAL WIDGET (active subscribers only) ────────────────── */}
       {isActive && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-800">Refer & Earn</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+        <div className="bg-surface-1 border border-border-1 overflow-hidden">
+          <div className="px-6 py-4 border-b border-border-0">
+            <h2 className="text-sm font-semibold text-text-primary">Refer & Earn</h2>
+            <p className="text-xs text-text-secondary mt-0.5">
               Share your link. When a shop signs up, you get <strong>$50 AUD credit</strong> and they get
               <strong> 20% off for 3 months</strong>.
             </p>
@@ -411,11 +411,11 @@ function BillingContent() {
                   <input
                     readOnly
                     value={referral.link ?? ""}
-                    className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm font-mono bg-gray-50 text-gray-600"
+                    className="flex-1 border border-border-1 rounded px-3 py-2 text-sm font-mono bg-surface-1 text-text-secondary"
                   />
                   <button
                     onClick={() => referral.link && copyLink(referral.link)}
-                    className="shrink-0 px-4 py-2 text-sm font-medium bg-brand-green text-white rounded hover:bg-brand-green/90 transition-colors"
+                    className="shrink-0 px-4 py-2 text-sm font-medium bg-accent text-white rounded hover:bg-accent-dim transition-colors"
                   >
                     {copied ? "Copied!" : "Copy"}
                   </button>
@@ -423,22 +423,22 @@ function BillingContent() {
 
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-brand-green">{referral.totalReferrals ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Shops referred</p>
+                  <div className="bg-surface-1 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-accent">{referral.totalReferrals ?? 0}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">Shops referred</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-brand-green">${referral.totalCreditsEarnedAUD ?? "0.00"}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Credits earned</p>
+                  <div className="bg-surface-1 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-accent">${referral.totalCreditsEarnedAUD ?? "0.00"}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">Credits earned</p>
                   </div>
                 </div>
 
                 {/* Referral list */}
                 {(referral.referrals ?? []).length > 0 && (
-                  <div className="border border-gray-100 rounded-lg divide-y divide-gray-50">
+                  <div className="border border-border-0 rounded-lg divide-y divide-border-0">
                     {referral.referrals!.map((r, i) => (
                       <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs">
-                        <span className="text-gray-600 font-mono">{r.email}</span>
+                        <span className="text-text-secondary font-mono">{r.email}</span>
                         <span className="text-emerald-600 font-semibold">{r.creditEarned} ✓</span>
                       </div>
                     ))}
@@ -447,13 +447,13 @@ function BillingContent() {
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-text-secondary mb-4">
                   Generate your unique referral link. Your code will give referees 20% off for 3 months.
                 </p>
                 <button
                   onClick={handleGenerateReferralCode}
                   disabled={generatingCode}
-                  className="inline-flex items-center gap-2 text-sm font-semibold bg-brand-green text-white px-5 py-2.5 rounded hover:bg-brand-green/90 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-2 text-sm font-semibold bg-accent text-white px-5 py-2.5 rounded hover:bg-accent-dim transition-colors disabled:opacity-50"
                 >
                   {generatingCode && (
                     <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -468,8 +468,8 @@ function BillingContent() {
 
       {/* Features list */}
       {!isActive && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">What&apos;s included in every plan</p>
+        <div className="bg-surface-1 border border-border-1 p-6">
+          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-widest mb-4">What&apos;s included in every plan</p>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {[
               "AI invoice parsing (any PDF format)",
@@ -483,7 +483,7 @@ function BillingContent() {
               "Duplicate invoice detection",
               "Audit log for every sync",
             ].map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
+              <li key={f} className="flex items-center gap-2 text-sm text-text-secondary">
                 <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
