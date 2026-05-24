@@ -465,8 +465,8 @@ export default function ReviewPurchaseOrderPage() {
     }
   };
 
-  const inputCls = "w-full rounded border border-border-1 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent";
-  const cellCls = "w-full rounded border border-border-1 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent";
+  const inputCls = "w-full rounded border border-border-1 bg-surface-2 text-text-primary placeholder:text-text-tertiary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent";
+  const cellCls = "w-full rounded border border-border-1 bg-surface-2 text-text-primary placeholder:text-text-tertiary px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent";
   const isBusy = submitting || syncing || previewing;
 
   if (!loaded) {
