@@ -5,6 +5,7 @@ import type { ShopifyProduct } from "@/lib/types";
 import { loadCatalog } from "@/lib/catalogCache";
 import { loadEntries, saveEntry, clearAllEntries, syncCatalogToLocal, lookupByCode, lookupInMemory } from "@/lib/stockTakeDb";
 import BarcodeScanner, { type ScanResult } from "@/components/BarcodeScanner";
+import { Button } from "@/components/ui/Button";
 
 type Entry = { counted: number; done: boolean };
 
@@ -30,7 +31,6 @@ export default function StockTakePage() {
       setEntries(saved);
       setProducts(items);
       setLoading(false);
-      // Populate Dexie local catalog for multi-criteria scan lookup
       syncCatalogToLocal(items).catch(() => {});
     });
   }, []);
@@ -49,7 +49,6 @@ export default function StockTakePage() {
   }
 
   const handleScan = useCallback(async (code: string) => {
-    // 1. Try Dexie multi-criteria lookup (barcode → SKU → supplierSku)
     const dbResult = await lookupByCode(code);
     const variantId = dbResult?.item.variantId
       ?? lookupInMemory(code, products)?.variantId;
@@ -68,13 +67,11 @@ export default function StockTakePage() {
 
     const isDuplicate = (entries[variantId]?.counted ?? 0) > 0;
 
-    // Increment count
     patchEntry(variantId, {
       counted: (entries[variantId]?.counted ?? 0) + 1,
       done: true,
     });
 
-    // Feedback to scanner UI
     setScanResult({
       outcome: isDuplicate ? "duplicate" : "found",
       label,
@@ -83,7 +80,6 @@ export default function StockTakePage() {
     setScanFeedback({ code, found: true });
     setTimeout(() => setScanFeedback(null), 2000);
 
-    // Flash row in the list and scroll to it
     setFlashVariantId(variantId);
     setTimeout(() => setFlashVariantId(null), 1500);
     const cat = product?.productType || "Uncategorised";
@@ -122,7 +118,6 @@ export default function StockTakePage() {
     XLSX.writeFile(wb, `stock-variances-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
-  // Group by category, sorted
   const grouped = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = q
@@ -141,7 +136,6 @@ export default function StockTakePage() {
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(p);
     }
-    // Sort categories alphabetically, Uncategorised last
     return Array.from(map.entries()).sort(([a], [b]) => {
       if (a === "Uncategorised") return 1;
       if (b === "Uncategorised") return -1;
@@ -149,7 +143,6 @@ export default function StockTakePage() {
     });
   }, [products, search]);
 
-  // Overall progress
   const { totalVariants, doneCount } = useMemo(() => {
     const total = products.length;
     const done = Object.values(entries).filter((e) => e.done).length;
@@ -160,7 +153,6 @@ export default function StockTakePage() {
 
   function scrollToCategory(cat: string) {
     setActiveCategory(cat);
-    // Expand if collapsed
     setCollapsed((prev) => ({ ...prev, [cat]: false }));
     categoryRefs.current[cat]?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -182,7 +174,6 @@ export default function StockTakePage() {
     });
   }
 
-  // Items with variances — only counted+done rows where counted ≠ onHandQtyStore
   const variantItems = useMemo(() =>
     products
       .filter((p) => entries[p.variantId]?.done)
@@ -228,25 +219,27 @@ export default function StockTakePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 text-gray-400 p-10 justify-center">
-        <div className="w-5 h-5 border-2 border-gray-200 border-t-brand-green rounded-full animate-spin" />
-        Loading stock take…
+      <div className="flex items-center gap-3 text-text-tertiary p-10 justify-center font-mono text-sm">
+        <span className="w-4 h-4 border border-border-1 border-t-accent animate-spinner rounded-full" />
+        Loading catalog…
       </div>
     );
   }
 
   if (products.length === 0) {
     return (
-      <div className="p-10 text-center text-gray-500">
-        <p className="text-4xl mb-3">📦</p>
-        <p className="font-medium mb-2">No products in catalog</p>
-        <p className="text-sm text-gray-400">Go to <a href="/catalog" className="text-brand-green underline">Catalog</a> and click Sync Now first.</p>
+      <div className="p-10 text-center">
+        <p className="text-2xl mb-3 font-mono text-text-tertiary">[  ]</p>
+        <p className="font-medium text-text-primary mb-1 text-sm">No products in catalog</p>
+        <p className="text-xs text-text-tertiary">Go to <a href="/catalog" className="text-accent hover:text-accent-dim underline transition-colors">Catalog</a> and sync first.</p>
       </div>
     );
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
+
+      {/* ── Barcode scanner overlay ── */}
       {scannerOpen && (
         <BarcodeScanner
           onDetected={handleScan}
@@ -258,43 +251,49 @@ export default function StockTakePage() {
 
       {/* ── Commit confirm modal ── */}
       {commitModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-[var(--ps-overlay)] flex items-center justify-center p-4">
+          <div className="bg-surface-1 border border-border-0 w-full max-w-2xl max-h-[80vh] flex flex-col animate-modal-in"
+               style={{ borderTop: "2px solid var(--ps-status-drift)" }}>
+            <div className="px-5 py-4 border-b border-border-0 flex items-start justify-between">
               <div>
-                <h2 className="font-semibold text-gray-800">Commit Stock Take to Shopify</h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-medium text-text-primary">Commit Stock Take to Shopify</p>
+                <p className="text-xs text-text-tertiary mt-0.5 font-mono">
                   {variantItems.length === 0
                     ? "All counted items match current Shopify levels."
-                    : `${variantItems.length} variant${variantItems.length !== 1 ? "s" : ""} will be adjusted. Shopify levels are fetched live before applying.`}
+                    : `${variantItems.length} variant${variantItems.length !== 1 ? "s" : ""} will be adjusted`}
                 </p>
               </div>
-              <button onClick={() => setCommitModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+              <button onClick={() => setCommitModalOpen(false)} className="w-5 h-5 flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square"/>
+                </svg>
+              </button>
             </div>
 
             {variantItems.length > 0 ? (
               <div className="overflow-y-auto flex-1">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-50">
-                    <tr className="text-left text-[11px] text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                      <th className="px-5 py-3">Product</th>
-                      <th className="px-5 py-3 text-right">Expected</th>
-                      <th className="px-5 py-3 text-right">Counted</th>
-                      <th className="px-5 py-3 text-right">Delta</th>
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-surface-2">
+                    <tr className="border-b border-border-0">
+                      {["Product", "Expected", "Counted", "Delta"].map((h, i) => (
+                        <th key={h} className={`px-5 py-2.5 text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest ${i > 0 ? "text-right" : "text-left"}`}>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {variantItems.map(({ product: p, counted, expected, delta }) => (
-                      <tr key={p.variantId} className="border-b border-gray-50 hover:bg-gray-50/60">
+                      <tr key={p.variantId} className="border-t border-border-0 hover:bg-surface-2 transition-colors">
                         <td className="px-5 py-2.5">
-                          <p className="font-medium text-gray-800 text-xs">{p.productTitle}</p>
-                          {p.variantTitle && <p className="text-[11px] text-gray-400">{p.variantTitle}</p>}
-                          <p className="text-[10px] text-gray-400 font-mono mt-0.5">{p.sku}</p>
+                          <p className="font-sans text-sm text-text-primary">{p.productTitle}</p>
+                          {p.variantTitle && <p className="text-xs text-text-secondary">{p.variantTitle}</p>}
+                          <p className="text-2xs text-text-tertiary font-mono mt-0.5">{p.sku}</p>
                         </td>
-                        <td className="px-5 py-2.5 text-right text-gray-600 text-xs">{expected}</td>
-                        <td className="px-5 py-2.5 text-right text-gray-800 font-semibold text-xs">{counted}</td>
-                        <td className="px-5 py-2.5 text-right text-xs font-bold">
-                          <span className={delta > 0 ? "text-emerald-600" : "text-red-600"}>
+                        <td className="px-5 py-2.5 text-right font-mono text-sm text-text-secondary tabular-nums">{expected}</td>
+                        <td className="px-5 py-2.5 text-right font-mono text-sm text-text-primary tabular-nums font-semibold">{counted}</td>
+                        <td className="px-5 py-2.5 text-right font-mono text-sm tabular-nums font-semibold">
+                          <span className={delta > 0 ? "text-status-match" : "text-status-shortage"}>
                             {delta > 0 ? "+" : ""}{delta}
                           </span>
                         </td>
@@ -304,64 +303,78 @@ export default function StockTakePage() {
                 </table>
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center py-12 text-gray-400 text-sm">
-                Nothing to commit — all counts match Shopify.
+              <div className="flex-1 flex items-center justify-center py-12 text-text-tertiary text-sm font-mono">
+                Nothing to commit — all counts match.
               </div>
             )}
 
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between gap-3">
-              <p className="text-[11px] text-amber-600">
-                Live Shopify quantities are fetched right before applying to prevent order race conditions.
+            <div className="px-5 py-3 border-t border-border-0 bg-surface-2 flex items-center justify-between gap-3">
+              <p className="text-2xs font-mono text-text-tertiary">
+                Live Shopify quantities fetched before apply — prevents race conditions
               </p>
               <div className="flex gap-2 shrink-0">
-                <button onClick={() => setCommitModalOpen(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded transition-colors">
-                  Cancel
-                </button>
-                <button
+                <Button variant="ghost" size="sm" onClick={() => setCommitModalOpen(false)}>Cancel</Button>
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={handleCommit}
+                  loading={committing}
                   disabled={committing || variantItems.length === 0}
-                  className="inline-flex items-center gap-2 bg-brand-green hover:bg-brand-green/90 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded transition-colors"
                 >
-                  {committing && <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>}
-                  {committing ? "Committing…" : "Confirm & Push to Shopify"}
-                </button>
+                  {committing ? "Committing…" : "Push to Shopify"}
+                </Button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Commit result banner */}
+      {/* ── Commit result banner ── */}
       {commitResult && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold flex items-center gap-3 ${commitResult.success ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
-          {commitResult.success
-            ? commitResult.message
-              ? `✓ ${commitResult.message}`
-              : `✓ ${commitResult.adjustedCount} variant${commitResult.adjustedCount !== 1 ? "s" : ""} updated in Shopify`
-            : `✗ ${commitResult.message}`}
-          <button onClick={() => setCommitResult(null)} className="ml-2 opacity-70 hover:opacity-100">×</button>
+        <div
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 border text-sm font-mono animate-fade-in ${
+            commitResult.success
+              ? "bg-status-match-bg border-status-match text-status-match"
+              : "bg-status-shortage-bg border-status-shortage text-status-shortage"
+          }`}
+        >
+          <span>{commitResult.success ? "✓" : "✗"}</span>
+          <span>
+            {commitResult.success
+              ? commitResult.message ?? `${commitResult.adjustedCount} variant${commitResult.adjustedCount !== 1 ? "s" : ""} updated`
+              : commitResult.message}
+          </span>
+          <button onClick={() => setCommitResult(null)} className="ml-1 opacity-60 hover:opacity-100 text-base leading-none">×</button>
         </div>
       )}
 
-      {/* Scan feedback toast */}
+      {/* ── Scan feedback toast ── */}
       {scanFeedback && (
-        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-40 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold transition-all ${scanFeedback.found ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
-          {scanFeedback.found ? `✓ Found: ${scanFeedback.code}` : `✗ Not found: ${scanFeedback.code}`}
+        <div
+          className={`fixed top-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 border text-xs font-mono animate-fade-in pointer-events-none ${
+            scanFeedback.found
+              ? "bg-status-match-bg border-status-match text-status-match"
+              : "bg-status-shortage-bg border-status-shortage text-status-shortage"
+          }`}
+        >
+          {scanFeedback.found ? `✓ ${scanFeedback.code}` : `✗ NOT FOUND: ${scanFeedback.code}`}
         </div>
       )}
-      {/* ── Left sidebar: category nav ── */}
-      <aside className="hidden lg:flex flex-col w-52 shrink-0 border-r border-gray-200 bg-[#eef1ee] overflow-y-auto">
-        <div className="px-4 py-4 border-b border-gray-200">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Categories</p>
-          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+
+      {/* ── Category sidebar (desktop) ── */}
+      <aside className="hidden lg:flex flex-col w-52 shrink-0 border-r border-border-0 bg-surface-1 overflow-y-auto">
+        <div className="px-4 py-3 border-b border-border-0">
+          <p className="text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest mb-2">Categories</p>
+          {/* Progress bar — hard rect, no rounded-full */}
+          <div className="h-px bg-border-0 overflow-hidden mb-2">
             <div
-              className="h-full bg-brand-green rounded-full transition-all"
+              className="h-full bg-accent transition-all duration-300"
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          <p className="text-[11px] text-gray-500 mt-1.5">{doneCount} / {totalVariants} counted</p>
+          <p className="text-2xs font-mono text-text-tertiary">{doneCount} / {totalVariants} counted</p>
         </div>
-        <nav className="flex-1 py-2">
+        <nav className="flex-1 py-1">
           {grouped.map(([cat, items]) => {
             const catDone = items.filter((p) => entries[p.variantId]?.done).length;
             const allDone = catDone === items.length;
@@ -369,16 +382,18 @@ export default function StockTakePage() {
               <button
                 key={cat}
                 onClick={() => scrollToCategory(cat)}
-                className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
+                className={[
+                  "w-full text-left h-8 px-4 text-sm transition-colors border-l-2 flex items-center justify-between gap-2",
                   activeCategory === cat
-                    ? "bg-brand-sage/60 text-brand-green font-medium"
-                    : "text-gray-600 hover:bg-brand-sage/30 hover:text-brand-green"
-                }`}
+                    ? "border-accent text-text-primary bg-accent-muted font-medium"
+                    : "border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2",
+                ].join(" ")}
               >
-                <span className="truncate">{cat}</span>
-                <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                  allDone ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
-                }`}>
+                <span className="truncate text-xs">{cat}</span>
+                <span
+                  className="shrink-0 font-mono text-2xs"
+                  style={{ color: allDone ? "var(--ps-status-match)" : "var(--ps-text-tertiary)" }}
+                >
                   {catDone}/{items.length}
                 </span>
               </button>
@@ -386,10 +401,10 @@ export default function StockTakePage() {
           })}
         </nav>
         {doneCount > 0 && (
-          <div className="px-4 py-3 border-t border-gray-200">
+          <div className="px-4 py-3 border-t border-border-0">
             <button
               onClick={resetAll}
-              className="w-full text-xs text-gray-400 hover:text-red-500 transition-colors text-left"
+              className="text-2xs font-mono text-text-tertiary hover:text-status-shortage transition-colors"
             >
               Reset all counts
             </button>
@@ -399,77 +414,93 @@ export default function StockTakePage() {
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
+
         {/* Top bar */}
-        <div className="px-5 py-4 border-b border-gray-200 bg-white flex items-center gap-4 flex-wrap shrink-0">
-          <div className="flex-1">
-            <h1 className="font-display text-2xl leading-none tracking-wide text-brand-green">Stock Take</h1>
-            <p className="text-xs text-gray-400 mt-0.5">{doneCount} of {totalVariants} variants counted · {progressPct}%</p>
+        <div className="flex-none px-4 h-12 border-b border-border-0 bg-surface-1 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <span className="font-sans text-base font-semibold text-text-primary">Stock Take</span>
+            <span className="ml-3 font-mono text-xs text-text-tertiary">{doneCount}/{totalVariants} · {progressPct}%</span>
           </div>
-          {/* Mobile progress */}
+
+          {/* Mobile progress strip */}
           <div className="flex items-center gap-2 lg:hidden">
-            <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-brand-green rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+            <div className="w-20 h-px bg-border-0 overflow-hidden">
+              <div className="h-full bg-accent transition-all" style={{ width: `${progressPct}%` }} />
             </div>
-            <span className="text-xs text-gray-500">{progressPct}%</span>
           </div>
+
           {/* Search */}
-          <div className="relative w-64">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          <div className="relative hidden sm:block">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35" strokeLinecap="square"/>
             </svg>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search product, SKU, barcode…"
-              className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-brand-green transition-colors"
+              placeholder="Product, SKU, barcode…"
+              className="pl-7 pr-3 h-7 w-52 text-xs bg-surface-2 border border-border-0 text-text-primary placeholder:text-text-tertiary font-mono focus:outline-none focus:border-border-2 focus:ring-2 focus:ring-[var(--ps-focus)] transition-colors"
             />
             {search && (
-              <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm leading-none">&times;</button>
+              <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary text-sm">×</button>
             )}
           </div>
-          {/* Camera scan button */}
+
+          {/* SCAN — primary action, always visible */}
           <button
             onClick={() => setScannerOpen(true)}
-            className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green/90 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors"
-            title="Scan barcode with camera"
+            className="inline-flex items-center gap-2 h-8 px-3 bg-accent hover:bg-accent-dim text-white text-xs font-medium font-sans border border-accent hover:border-accent-dim transition-colors"
+            title="Open barcode scanner"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9V6a3 3 0 013-3h3M3 15v3a3 3 0 003 3h3m9-18h3a3 3 0 013 3v3m0 6v3a3 3 0 01-3 3h-3M9 9h1M14 9h1M9 12h1M14 12h1M9 15h1M14 15h1" />
+            {/* Barcode icon — hard lines */}
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 18 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="square">
+              <line x1="1"  y1="0" x2="1"  y2="14"/>
+              <line x1="3"  y1="0" x2="3"  y2="14"/>
+              <line x1="5"  y1="0" x2="5"  y2="14"/>
+              <line x1="7"  y1="0" x2="7"  y2="14"/>
+              <line x1="9"  y1="0" x2="9"  y2="14"/>
+              <line x1="11" y1="0" x2="11" y2="14"/>
+              <line x1="13" y1="0" x2="13" y2="14"/>
+              <line x1="15" y1="0" x2="15" y2="14"/>
+              <line x1="17" y1="0" x2="17" y2="14"/>
             </svg>
             Scan
           </button>
+
           {doneItemCount > 0 && (
-            <div className="hidden lg:flex items-center gap-3">
-              <button
-                onClick={exportVariances}
-                className="inline-flex items-center gap-1.5 text-xs border border-gray-200 text-gray-500 hover:border-brand-green hover:text-brand-green px-3 py-1.5 rounded transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Export variances
-              </button>
-              <button
+            <div className="hidden lg:flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={exportVariances}>
+                Export
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => { setCommitResult(null); setCommitModalOpen(true); }}
-                className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green/90 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                </svg>
                 Commit to Shopify
-              </button>
-              <button onClick={resetAll} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+              </Button>
+              <button onClick={resetAll} className="text-2xs font-mono text-text-tertiary hover:text-status-shortage transition-colors px-1">
                 Reset
               </button>
             </div>
           )}
         </div>
 
+        {/* Mobile search */}
+        <div className="sm:hidden px-3 py-2 border-b border-border-0 bg-surface-2">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search product, SKU, barcode…"
+            className="w-full px-3 h-8 text-xs bg-surface-1 border border-border-0 text-text-primary placeholder:text-text-tertiary font-mono focus:outline-none focus:border-border-2 transition-colors"
+          />
+        </div>
+
         {/* Product list */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto py-2 px-3 space-y-2">
           {grouped.length === 0 && (
-            <div className="text-center py-16 text-gray-400 text-sm">No results for &ldquo;{search}&rdquo;</div>
+            <div className="text-center py-16 text-text-tertiary text-sm font-mono">No results for &ldquo;{search}&rdquo;</div>
           )}
 
           {grouped.map(([cat, items]) => {
@@ -481,38 +512,43 @@ export default function StockTakePage() {
               <div
                 key={cat}
                 ref={(el) => { categoryRefs.current[cat] = el; }}
-                className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+                className="bg-surface-1 border border-border-0 overflow-hidden"
               >
                 {/* Category header */}
                 <div
-                  className={`flex items-center justify-between px-4 py-3 cursor-pointer select-none border-b transition-colors ${
-                    allDone ? "bg-emerald-50 border-emerald-100" : "bg-gray-50 border-gray-100 hover:bg-brand-sage/20"
-                  }`}
+                  className={[
+                    "flex items-center justify-between px-4 h-9 cursor-pointer select-none border-b transition-colors",
+                    allDone
+                      ? "bg-status-match-bg border-status-match/20"
+                      : "bg-surface-2 border-border-0 hover:bg-surface-3",
+                  ].join(" ")}
                   onClick={() => toggleCategory(cat)}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <svg
-                      className={`w-4 h-4 text-gray-400 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
-                      viewBox="0 0 20 20" fill="currentColor"
+                      className={`w-3 h-3 text-text-tertiary transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                      viewBox="0 0 10 6" fill="currentColor"
                     >
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      <path d="M0 0l5 6 5-6z"/>
                     </svg>
-                    <span className={`font-semibold text-sm ${allDone ? "text-emerald-700" : "text-gray-700"}`}>
+                    <span className={`text-sm font-medium ${allDone ? "text-status-match" : "text-text-primary"}`}>
                       {cat}
                     </span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      allDone ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-500"
-                    }`}>
+                    <span
+                      className="font-mono text-2xs"
+                      style={{ color: allDone ? "var(--ps-status-match)" : "var(--ps-text-tertiary)" }}
+                    >
                       {catDone}/{items.length}
                     </span>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); markAllDone(cat, items); }}
-                    className={`text-xs font-medium px-3 py-1 rounded transition-colors ${
+                    className={[
+                      "text-2xs font-mono px-2 py-1 border transition-colors",
                       allDone
-                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                        : "bg-brand-sage/60 text-brand-green hover:bg-brand-sage"
-                    }`}
+                        ? "border-status-match/30 text-status-match hover:bg-status-match-bg"
+                        : "border-border-0 text-text-tertiary hover:border-border-1 hover:text-text-secondary",
+                    ].join(" ")}
                   >
                     {allDone ? "Unmark all" : "Mark all ✓"}
                   </button>
@@ -520,68 +556,71 @@ export default function StockTakePage() {
 
                 {/* Rows */}
                 {!isCollapsed && (
-                  <div className="divide-y divide-gray-50">
+                  <div className="divide-y divide-border-0">
                     {items.map((p) => {
                       const entry = entries[p.variantId] ?? { counted: 0, done: false };
                       const isFlashing = flashVariantId === p.variantId;
+                      const expected = (p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0);
+                      const delta = entry.counted - expected;
+
                       return (
                         <div
                           key={p.variantId}
                           ref={(el) => { variantRefs.current[p.variantId] = el; }}
-                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-                            isFlashing ? "bg-brand-green/20 ring-2 ring-brand-green/40" : entry.done ? "bg-emerald-50/40" : "hover:bg-gray-50/60"
-                          }`}
+                          className={[
+                            "flex items-center gap-3 px-4 py-2.5 transition-colors",
+                            isFlashing
+                              ? "animate-scan-pulse"
+                              : entry.done
+                                ? "bg-status-match-bg"
+                                : "hover:bg-surface-2",
+                          ].join(" ")}
                         >
-                          {/* Checkbox */}
+                          {/* Done toggle */}
                           <button
                             onClick={() => patchEntry(p.variantId, { done: !entry.done })}
-                            className={`shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            className={[
+                              "shrink-0 w-4 h-4 border flex items-center justify-center transition-colors",
                               entry.done
-                                ? "bg-brand-green border-brand-green"
-                                : "border-gray-300 hover:border-brand-green"
-                            }`}
+                                ? "bg-status-match border-status-match"
+                                : "border-border-2 hover:border-status-match",
+                            ].join(" ")}
                             aria-label="Mark as counted"
                           >
                             {entry.done && (
-                              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <svg className="w-2.5 h-2.5 text-canvas" viewBox="0 0 10 8" fill="none">
+                                <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" strokeLinejoin="miter"/>
                               </svg>
                             )}
                           </button>
 
                           {/* Product info */}
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${entry.done ? "text-gray-400 line-through" : "text-gray-800"}`}>
+                            <p className={`text-sm truncate ${entry.done ? "text-text-tertiary line-through" : "text-text-primary"}`}>
                               {p.productTitle}
-                              {p.variantTitle && (
-                                <span className="ml-1.5 font-normal text-gray-500">— {p.variantTitle}</span>
+                              {p.variantTitle && p.variantTitle !== "Default Title" && (
+                                <span className="ml-1.5 text-text-tertiary font-normal">— {p.variantTitle}</span>
                               )}
                             </p>
                             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                              {p.sku && (
-                                <span className="text-[11px] text-gray-400 font-mono">SKU: {p.sku}</span>
-                              )}
-                              {p.barcode && (
-                                <span className="text-[11px] text-gray-400 font-mono">Barcode: {p.barcode}</span>
-                              )}
-                              {(p.onHandQtyStore != null || p.onHandQtyWarehouse != null) && (
-                                <span className="text-[11px] text-gray-400">
-                                  Expected: {(p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0)}
-                                  {entry.done && entry.counted !== (p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0) && (
-                                    <span className={`ml-1 font-semibold ${entry.counted > (p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0) ? "text-emerald-600" : "text-red-500"}`}>
-                                      ({entry.counted > (p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0) ? "+" : ""}{entry.counted - ((p.onHandQtyStore ?? 0) + (p.onHandQtyWarehouse ?? 0))})
-                                    </span>
-                                  )}
+                              {p.sku && <span className="text-2xs text-text-tertiary font-mono">{p.sku}</span>}
+                              {p.barcode && <span className="text-2xs text-text-tertiary font-mono">{p.barcode}</span>}
+                              {entry.done && (
+                                <span className={`text-2xs font-mono font-semibold ${delta === 0 ? "text-status-match" : delta > 0 ? "text-status-match" : "text-status-shortage"}`}>
+                                  {delta === 0 ? "=" : delta > 0 ? `+${delta}` : `${delta}`}
                                 </span>
+                              )}
+                              {!entry.done && expected > 0 && (
+                                <span className="text-2xs text-text-tertiary font-mono">exp {expected}</span>
                               )}
                             </div>
                           </div>
 
-                          {/* Counter */}
-                          <div className="flex items-center gap-1 shrink-0">
+                          {/* Counter — flat stepper */}
+                          <div className="flex items-stretch shrink-0 border border-border-0">
                             <button
                               onClick={() => patchEntry(p.variantId, { counted: Math.max(0, entry.counted - 1) })}
-                              className="w-7 h-7 rounded border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:border-gray-300 transition-colors text-base leading-none font-medium"
+                              className="w-7 h-7 flex items-center justify-center text-text-secondary hover:bg-surface-3 hover:text-text-primary transition-colors border-r border-border-0 text-base font-medium"
                               aria-label="Decrease"
                             >
                               −
@@ -591,11 +630,11 @@ export default function StockTakePage() {
                               min={0}
                               value={entry.counted}
                               onChange={(e) => patchEntry(p.variantId, { counted: Math.max(0, parseInt(e.target.value) || 0) })}
-                              className="w-12 text-center text-sm font-semibold border border-gray-200 rounded py-1 focus:outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/30"
+                              className="w-11 text-center text-sm font-mono font-semibold tabular-nums bg-transparent text-text-primary outline-none border-none appearance-none"
                             />
                             <button
                               onClick={() => patchEntry(p.variantId, { counted: entry.counted + 1 })}
-                              className="w-7 h-7 rounded border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-brand-sage/60 hover:border-brand-green hover:text-brand-green transition-colors text-base leading-none font-medium"
+                              className="w-7 h-7 flex items-center justify-center text-text-secondary hover:bg-surface-3 hover:text-text-primary transition-colors border-l border-border-0 text-base font-medium"
                               aria-label="Increase"
                             >
                               +
@@ -609,6 +648,38 @@ export default function StockTakePage() {
               </div>
             );
           })}
+
+          {/* Mobile bottom spacer for the fixed scan button */}
+          <div className="h-20 lg:hidden" />
+        </div>
+
+        {/* Mobile fixed scan button — always reachable at the bottom */}
+        <div className="lg:hidden fixed bottom-0 inset-x-0 border-t border-border-0 bg-surface-1 p-3 flex gap-2">
+          <button
+            onClick={() => setScannerOpen(true)}
+            className="flex-1 h-12 bg-accent hover:bg-accent-dim text-white font-medium text-sm flex items-center justify-center gap-2.5 transition-colors"
+          >
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 18 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="square">
+              <line x1="1"  y1="0" x2="1"  y2="14"/>
+              <line x1="3"  y1="0" x2="3"  y2="14"/>
+              <line x1="5"  y1="0" x2="5"  y2="14"/>
+              <line x1="7"  y1="0" x2="7"  y2="14"/>
+              <line x1="9"  y1="0" x2="9"  y2="14"/>
+              <line x1="11" y1="0" x2="11" y2="14"/>
+              <line x1="13" y1="0" x2="13" y2="14"/>
+              <line x1="15" y1="0" x2="15" y2="14"/>
+              <line x1="17" y1="0" x2="17" y2="14"/>
+            </svg>
+            Scan Barcode
+          </button>
+          {doneItemCount > 0 && (
+            <button
+              onClick={() => { setCommitResult(null); setCommitModalOpen(true); }}
+              className="h-12 px-4 bg-surface-2 border border-border-0 text-text-primary text-sm font-medium transition-colors hover:bg-surface-3"
+            >
+              Commit
+            </button>
+          )}
         </div>
       </div>
     </div>
