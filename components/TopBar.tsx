@@ -9,18 +9,24 @@ interface TopBarProps {
 
 export default function TopBar({ onOpenSidebar }: TopBarProps) {
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center justify-between sticky top-0 z-20 lg:hidden">
+    <header className="bg-surface-1 border-b border-border-0 px-4 h-11 flex items-center justify-between sticky top-0 z-20 lg:hidden">
+      {/* Hamburger — 3 lines, 1px each */}
       <button
         onClick={onOpenSidebar}
-        className="flex flex-col gap-1 p-1 text-gray-600 hover:text-brand-green transition-colors"
+        className="flex flex-col gap-[5px] p-1.5 text-text-secondary hover:text-text-primary transition-colors"
         aria-label="Open menu"
       >
-        <span className="block w-5 h-0.5 bg-current" />
-        <span className="block w-5 h-0.5 bg-current" />
-        <span className="block w-5 h-0.5 bg-current" />
+        <span className="block w-[18px] h-px bg-current" />
+        <span className="block w-[18px] h-px bg-current" />
+        <span className="block w-[18px] h-px bg-current" />
       </button>
-      <Link href="/dashboard"><PitStopLogo className="text-brand-green" /></Link>
-      <span className="w-7" aria-hidden="true" />
+
+      <Link href="/dashboard">
+        <PitStopLogo />
+      </Link>
+
+      {/* Balance placeholder */}
+      <span className="w-9" aria-hidden="true" />
     </header>
   );
 }

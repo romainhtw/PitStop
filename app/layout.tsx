@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
-import { Bebas_Neue } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
-
-const bebas = Bebas_Neue({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-bebas",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "PitStop by Elite Racing",
@@ -21,8 +15,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${bebas.variable} antialiased bg-brand-light text-gray-900`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Inline script prevents FOUC — applies dark theme before first paint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('ps-theme');document.documentElement.setAttribute('data-theme',t||'dark');})();`,
+          }}
+        />
+      </head>
+      <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
         <AppShell />
         <main className="lg:ml-56 min-h-screen">{children}</main>
       </body>

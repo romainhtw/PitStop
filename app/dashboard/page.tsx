@@ -7,6 +7,9 @@ import { collection, getDocs, query, orderBy } from "firebase/firestore/lite";
 import { db } from "@/lib/firebase";
 import type { PurchaseOrder, POStatus, ShopifyProduct } from "@/lib/types";
 import FeedbackChat from "@/components/FeedbackChat";
+import { StatusBadge, StatusDot } from "@/components/ui/StatusBadge";
+import type { StatusType } from "@/components/ui/StatusBadge";
+import { Button } from "@/components/ui/Button";
 
 const PO_CHAT_CONTEXT = `The user is talking about the Purchase Orders feature in PitStop — an internal ops tool for Elite Racing Cycles, a bike shop in Perth with 10 staff and 5 per shift.
 
@@ -25,25 +28,12 @@ function fmt(n: number) {
   return `$${n.toFixed(2)}`;
 }
 
-function statusBadge(status: POStatus) {
-  const map: Record<POStatus, string> = {
-    draft: "bg-gray-100 text-gray-500",
-    awaiting_review: "bg-amber-50 text-amber-700",
-    ordered: "bg-blue-50 text-blue-700",
-    approved: "bg-brand-sage/60 text-brand-green",
-  };
-  const label: Record<POStatus, string> = {
-    draft: "Draft",
-    awaiting_review: "Awaiting Review",
-    ordered: "Ordered",
-    approved: "Approved",
-  };
-  return (
-    <span className={`inline-block px-2 py-0.5 rounded-sm text-[10px] font-semibold tracking-wide ${map[status]}`}>
-      {label[status]}
-    </span>
-  );
-}
+const STATUS_MAP: Record<POStatus, StatusType> = {
+  draft: "DRAFT",
+  awaiting_review: "AWAITING_REVIEW",
+  ordered: "ORDERED",
+  approved: "APPROVED",
+};
 
 function DeleteButton({ po, onDelete }: { po: PurchaseOrder; onDelete: (id: string) => void }) {
   const [confirming, setConfirming] = useState(false);
@@ -69,30 +59,30 @@ function DeleteButton({ po, onDelete }: { po: PurchaseOrder; onDelete: (id: stri
 
   if (deleteError) {
     return (
-      <span className="inline-flex items-center gap-1.5">
-        <span className="text-xs text-red-600">{deleteError}</span>
-        <button onClick={() => { setDeleteError(null); setConfirming(false); }} className="text-xs text-gray-400 hover:underline">Dismiss</button>
+      <span className="inline-flex items-center gap-2">
+        <span className="text-xs text-status-shortage">{deleteError}</span>
+        <button onClick={() => { setDeleteError(null); setConfirming(false); }} className="text-xs text-text-tertiary hover:text-text-secondary">Dismiss</button>
       </span>
     );
   }
 
   if (confirming) {
     return (
-      <span className="inline-flex items-center gap-1.5 flex-wrap">
+      <span className="inline-flex items-center gap-2 flex-wrap">
         {syncedCount > 0 && (
-          <span className="text-xs text-amber-700 font-medium">
-            ⚠️ {syncedCount} item{syncedCount !== 1 ? "s" : ""} will be deducted from Shopify stock
+          <span className="text-xs text-status-drift font-medium">
+            {syncedCount} item{syncedCount !== 1 ? "s" : ""} will be reversed in Shopify
           </span>
         )}
         <button
           onClick={handleDelete}
           disabled={deleting}
-          className="text-xs text-red-600 font-medium hover:underline disabled:opacity-50"
+          className="text-xs text-status-shortage font-medium hover:underline disabled:opacity-50"
         >
           {deleting ? "Reversing…" : "Confirm delete"}
         </button>
-        <span className="text-gray-300">|</span>
-        <button onClick={() => setConfirming(false)} className="text-xs text-gray-400 hover:underline">
+        <span className="text-border-1">|</span>
+        <button onClick={() => setConfirming(false)} className="text-xs text-text-tertiary hover:text-text-secondary">
           Cancel
         </button>
       </span>
@@ -102,12 +92,36 @@ function DeleteButton({ po, onDelete }: { po: PurchaseOrder; onDelete: (id: stri
   return (
     <button
       onClick={() => setConfirming(true)}
-      className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none"
+      className="w-5 h-5 flex items-center justify-center text-text-tertiary hover:text-status-shortage transition-colors"
       aria-label="Delete"
     >
-      &times;
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square"/>
+      </svg>
     </button>
   );
+}
+
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  loading: boolean;
+  href?: string;
+  children?: React.ReactNode;
+}
+
+function StatCard({ label, value, loading, href, children }: StatCardProps) {
+  const inner = (
+    <div className="bg-surface-1 border border-border-0 p-5 flex flex-col gap-2 hover:border-border-1 transition-colors">
+      <p className="text-2xs font-mono text-text-tertiary uppercase tracking-widest">{label}</p>
+      {loading ? (
+        <div className="h-8 w-24 bg-surface-3 animate-pulse" />
+      ) : children ?? (
+        <p className="font-mono text-2xl font-semibold text-text-primary tabular-nums">{value}</p>
+      )}
+    </div>
+  );
+  return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
 export default function DashboardPage() {
@@ -124,7 +138,6 @@ export default function DashboardPage() {
       .then((data) => setOrders(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
 
-    // Fetch stock alert counts from Firestore catalog
     getDocs(query(collection(db, "shopifyProducts"), orderBy("productTitle")))
       .then((snap) => {
         const products = snap.docs.map((d) => d.data() as ShopifyProduct);
@@ -174,20 +187,10 @@ export default function DashboardPage() {
       )
     : orders;
 
-  const totalCost = orders.reduce(
-    (s, po) => s + po.lineItems.reduce((a, li) => a + li.qty * li.costPrice, 0),
-    0
-  );
-  const totalRetail = orders.reduce(
-    (s, po) => s + po.lineItems.reduce((a, li) => a + li.qty * li.retailPrice, 0),
-    0
-  );
-  const totalItems = orders.reduce(
-    (s, po) => s + po.lineItems.reduce((a, li) => a + li.qty, 0),
-    0
-  );
+  const totalCost   = orders.reduce((s, po) => s + po.lineItems.reduce((a, li) => a + li.qty * li.costPrice, 0), 0);
+  const totalRetail = orders.reduce((s, po) => s + po.lineItems.reduce((a, li) => a + li.qty * li.retailPrice, 0), 0);
+  const totalItems  = orders.reduce((s, po) => s + po.lineItems.reduce((a, li) => a + li.qty, 0), 0);
 
-  // Supplier spend analytics — computed from approved POs only
   const supplierSpend = orders
     .filter((po) => po.status === "approved")
     .reduce<Record<string, { spend: number; poCount: number; items: number }>>((acc, po) => {
@@ -200,142 +203,125 @@ export default function DashboardPage() {
       acc[key].items += items;
       return acc;
     }, {});
-  const supplierRows = Object.entries(supplierSpend)
-    .sort((a, b) => b[1].spend - a[1].spend)
-    .slice(0, 10);
+  const supplierRows = Object.entries(supplierSpend).sort((a, b) => b[1].spend - a[1].spend).slice(0, 10);
 
   return (
-    <div className="p-4 lg:p-10 max-w-7xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 lg:p-8 max-w-7xl">
+
+      {/* Page header */}
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="font-display text-4xl leading-none tracking-wide text-brand-green">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">Inventory at a glance.</p>
+          <h1 className="font-sans text-2xl font-semibold text-text-primary tracking-tight">Dashboard</h1>
+          <p className="text-xs text-text-tertiary mt-0.5 font-mono">Inventory at a glance</p>
         </div>
         <div className="flex items-center gap-2">
           <FeedbackChat context={PO_CHAT_CONTEXT} buttonLabel="Request a change" />
-          <Link
-            href="/purchase-orders/new"
-            className="bg-brand-green hover:bg-brand-green/90 text-white text-sm font-medium px-4 py-2 rounded transition-colors"
-          >
-            + New Purchase Order
+          <Link href="/purchase-orders/new">
+            <Button variant="primary" size="sm">+ New Order</Button>
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded border border-gray-200 p-5">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Total Cost Value</div>
-          <div className="font-display text-5xl leading-none text-brand-green mt-2">
-            {loading ? <span className="text-gray-200 animate-pulse">—</span> : fmt(totalCost)}
-          </div>
-        </div>
-        <div className="bg-white rounded border border-gray-200 p-5">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Total Retail Value</div>
-          <div className="font-display text-5xl leading-none text-brand-green mt-2">
-            {loading ? <span className="text-gray-200 animate-pulse">—</span> : fmt(totalRetail)}
-          </div>
-        </div>
-        <div className="bg-white rounded border border-gray-200 p-5">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Total Items</div>
-          <div className="font-display text-5xl leading-none text-brand-green mt-2">
-            {loading ? <span className="text-gray-200 animate-pulse">—</span> : totalItems}
-          </div>
-        </div>
-        <Link href="/catalog?filter=out" className="block bg-white rounded border border-gray-200 p-5 hover:border-brand-green transition-colors group">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Stock Alerts</div>
-          {stockAlerts === null ? (
-            <div className="font-display text-5xl leading-none text-gray-200 animate-pulse mt-2">—</div>
-          ) : stockAlerts.out === 0 && stockAlerts.low === 0 ? (
-            <div className="font-display text-5xl leading-none text-emerald-500 mt-2">✓</div>
-          ) : (
-            <div className="mt-2 space-y-1">
-              {stockAlerts.out > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                  <span className="text-sm font-semibold text-red-600">{stockAlerts.out} out of stock</span>
-                </div>
-              )}
-              {stockAlerts.low > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                  <span className="text-sm font-semibold text-amber-600">{stockAlerts.low} low stock</span>
-                </div>
-              )}
-            </div>
+      {/* Stat strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px border border-border-0 bg-border-0 mb-6 overflow-hidden">
+        <StatCard label="Cost Value"  value={fmt(totalCost)}   loading={loading} />
+        <StatCard label="Retail Value" value={fmt(totalRetail)} loading={loading} />
+        <StatCard label="Total Items" value={totalItems}        loading={loading} />
+        <StatCard label="Stock Alerts" value="" loading={stockAlerts === null} href="/catalog?filter=out">
+          {stockAlerts !== null && (
+            stockAlerts.out === 0 && stockAlerts.low === 0 ? (
+              <p className="font-mono text-sm text-status-match">All clear</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {stockAlerts.out > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <StatusDot status="QTY_SHORTAGE" />
+                    <span className="font-mono text-xs text-status-shortage">{stockAlerts.out} out of stock</span>
+                  </div>
+                )}
+                {stockAlerts.low > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <StatusDot status="COST_DRIFT" />
+                    <span className="font-mono text-xs text-status-drift">{stockAlerts.low} low stock</span>
+                  </div>
+                )}
+              </div>
+            )
           )}
-        </Link>
+        </StatCard>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide shrink-0">Purchase Orders</h2>
+      {/* Purchase Orders table */}
+      <div className="bg-surface-1 border border-border-0 mb-6">
+        {/* Table header */}
+        <div className="flex items-center gap-3 px-4 h-11 border-b border-border-0">
+          <span className="text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest shrink-0">
+            Purchase Orders
+          </span>
           <div className="relative flex-1 max-w-xs">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35" strokeLinecap="square"/>
             </svg>
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search supplier, invoice, date…"
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-brand-green transition-colors"
+              placeholder="Supplier, invoice, date…"
+              className="w-full pl-7 pr-3 h-7 text-xs bg-surface-2 border border-border-0 text-text-primary placeholder:text-text-tertiary font-mono focus:outline-none focus:border-border-2 focus:ring-2 focus:ring-[var(--ps-focus)] transition-colors"
             />
           </div>
           {search && (
-            <button onClick={() => setSearch("")} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">
+            <button onClick={() => setSearch("")} className="text-xs text-text-tertiary hover:text-text-secondary shrink-0">
               Clear
             </button>
           )}
         </div>
 
         {loading ? (
-          <div className="p-12 text-center text-gray-400 text-sm">Loading…</div>
+          <div className="flex items-center justify-center h-32 text-text-tertiary text-sm font-mono">
+            Loading…
+          </div>
         ) : orders.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            <p className="mb-4">No purchase orders yet.</p>
-            <Link href="/purchase-orders/new" className="text-brand-green underline hover:no-underline">
-              Create your first one
+          <div className="flex flex-col items-center justify-center h-32 gap-2">
+            <p className="text-sm text-text-tertiary">No purchase orders yet</p>
+            <Link href="/purchase-orders/new" className="text-xs text-accent hover:text-accent-dim font-mono transition-colors">
+              Create your first one →
             </Link>
           </div>
         ) : (
           <>
-            {/* Mobile cards — hidden on lg+ */}
-            <div className="lg:hidden divide-y divide-gray-100">
+            {/* Mobile cards */}
+            <div className="lg:hidden divide-y divide-border-0">
               {filtered.length === 0 && (
-                <div className="p-8 text-center text-gray-400 text-sm">No results for &ldquo;{search}&rdquo;</div>
+                <div className="p-8 text-center text-text-tertiary text-sm font-mono">No results for &ldquo;{search}&rdquo;</div>
               )}
               {filtered.map((po) => {
                 const cost = po.lineItems.reduce((a, li) => a + li.qty * li.costPrice, 0);
                 return (
-                  <div key={po.id} className="px-5 py-4 hover:bg-brand-sage/20">
+                  <div key={po.id} className="px-4 py-3 hover:bg-surface-2 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-gray-900 text-sm">{po.supplier || "—"}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">#{po.invoiceNumber || "—"} · {po.invoiceDate || "—"}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{po.location}</p>
+                        <p className="font-sans text-sm font-medium text-text-primary">{po.supplier || "—"}</p>
+                        <p className="font-mono text-xs text-text-secondary mt-0.5">#{po.invoiceNumber || "—"} · {po.invoiceDate || "—"}</p>
+                        <p className="font-mono text-xs text-text-tertiary">{po.location}</p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold text-brand-green text-sm">{fmt(cost)}</p>
-                        <div className="mt-1">{statusBadge(po.status)}</div>
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                        <p className="font-mono text-sm font-semibold text-text-primary tabular-nums">{fmt(cost)}</p>
+                        <StatusBadge status={STATUS_MAP[po.status]} />
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <Link href={`/purchase-orders/${po.id}/review`} className="text-xs font-medium text-brand-green hover:underline">View →</Link>
+                    <div className="flex items-center justify-between mt-2.5">
+                      <Link href={`/purchase-orders/${po.id}/review`} className="text-xs font-medium text-accent hover:text-accent-dim transition-colors">
+                        View →
+                      </Link>
                       <div className="flex items-center gap-3">
                         {po.status === "ordered" && (
-                          <Link
-                            href={`/purchase-orders/${po.id}/reconcile`}
-                            className="text-xs font-medium text-blue-600 hover:underline"
-                          >
-                            Receive Invoice
+                          <Link href={`/purchase-orders/${po.id}/reconcile`} className="text-xs font-medium text-status-pending hover:underline">
+                            Receive
                           </Link>
                         )}
-                        <button
-                          onClick={() => handleReuse(po)}
-                          disabled={reusing === po.id}
-                          className="text-xs text-gray-400 hover:text-brand-green transition-colors disabled:opacity-50"
-                        >
-                          {reusing === po.id ? "Creating…" : "Reuse"}
+                        <button onClick={() => handleReuse(po)} disabled={reusing === po.id} className="text-xs text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50">
+                          {reusing === po.id ? "…" : "Reuse"}
                         </button>
                         <DeleteButton po={po} onDelete={handleDelete} />
                       </div>
@@ -345,63 +331,54 @@ export default function DashboardPage() {
               })}
             </div>
 
-            {/* Desktop table — hidden on mobile */}
+            {/* Desktop table */}
             <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full">
                 <thead>
-                  <tr className="text-left bg-white border-b border-gray-200">
-                    <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Invoice #</th>
-                    <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Supplier</th>
-                    <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Date</th>
-                    <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Location</th>
-                    <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Items</th>
-                    <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Total Cost</th>
-                    <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Status</th>
-                    <th className="px-5 py-3"></th>
-                    <th className="px-5 py-3 w-10"></th>
+                  <tr className="border-b border-border-0">
+                    {["Invoice #", "Supplier", "Date", "Location", "Items", "Total Cost", "Status", "", ""].map((h, i) => (
+                      <th key={i} className="px-4 py-2.5 text-left text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest first:pl-5 last:pr-5">
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-5 py-8 text-center text-gray-400 text-sm">No results for &ldquo;{search}&rdquo;</td>
+                      <td colSpan={9} className="px-5 py-8 text-center text-text-tertiary text-sm font-mono">
+                        No results for &ldquo;{search}&rdquo;
+                      </td>
                     </tr>
                   )}
                   {filtered.map((po) => {
                     const itemsCount = po.lineItems.reduce((a, li) => a + li.qty, 0);
-                    const cost = po.lineItems.reduce((a, li) => a + li.qty * li.costPrice, 0);
+                    const cost       = po.lineItems.reduce((a, li) => a + li.qty * li.costPrice, 0);
                     return (
-                      <tr key={po.id} className="border-t border-gray-100 hover:bg-brand-sage/20">
-                        <td className="px-5 py-3 font-medium">{po.invoiceNumber || "—"}</td>
-                        <td className="px-5 py-3">{po.supplier || "—"}</td>
-                        <td className="px-5 py-3">{po.invoiceDate || "—"}</td>
-                        <td className="px-5 py-3">{po.location}</td>
-                        <td className="px-5 py-3">{itemsCount}</td>
-                        <td className="px-5 py-3">{fmt(cost)}</td>
-                        <td className="px-5 py-3">{statusBadge(po.status)}</td>
-                        <td className="px-5 py-3 text-right">
+                      <tr key={po.id} className="border-t border-border-0 hover:bg-surface-2 transition-colors">
+                        <td className="pl-5 pr-4 py-2.5 font-mono text-sm text-text-primary">{po.invoiceNumber || "—"}</td>
+                        <td className="px-4 py-2.5 font-sans text-sm text-text-primary">{po.supplier || "—"}</td>
+                        <td className="px-4 py-2.5 font-mono text-sm text-text-secondary">{po.invoiceDate || "—"}</td>
+                        <td className="px-4 py-2.5 font-mono text-sm text-text-secondary">{po.location}</td>
+                        <td className="px-4 py-2.5 font-mono text-sm text-text-primary tabular-nums text-right">{itemsCount}</td>
+                        <td className="px-4 py-2.5 font-mono text-sm text-text-primary tabular-nums text-right">{fmt(cost)}</td>
+                        <td className="px-4 py-2.5"><StatusBadge status={STATUS_MAP[po.status]} /></td>
+                        <td className="px-4 py-2.5 text-right">
                           <div className="flex items-center justify-end gap-4">
                             {po.status === "ordered" && (
-                              <Link
-                                href={`/purchase-orders/${po.id}/reconcile`}
-                                className="text-sm font-medium text-blue-600 hover:underline"
-                              >
-                                Receive Invoice
+                              <Link href={`/purchase-orders/${po.id}/reconcile`} className="text-xs text-status-pending hover:underline transition-colors">
+                                Receive
                               </Link>
                             )}
-                            <button
-                              onClick={() => handleReuse(po)}
-                              disabled={reusing === po.id}
-                              className="text-sm text-gray-400 hover:text-brand-green transition-colors disabled:opacity-50"
-                            >
+                            <button onClick={() => handleReuse(po)} disabled={reusing === po.id} className="text-xs text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50">
                               {reusing === po.id ? "Creating…" : "Reuse"}
                             </button>
-                            <Link href={`/purchase-orders/${po.id}/review`} className="text-sm font-medium text-brand-green hover:underline">
-                              View
+                            <Link href={`/purchase-orders/${po.id}/review`} className="text-xs font-medium text-accent hover:text-accent-dim transition-colors">
+                              View →
                             </Link>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-center">
+                        <td className="pr-5 pl-2 py-2.5 text-center">
                           <DeleteButton po={po} onDelete={handleDelete} />
                         </td>
                       </tr>
@@ -414,41 +391,44 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Supplier Spend Analytics */}
+      {/* Supplier Spend */}
       {supplierRows.length > 0 && (
-        <div className="mt-8 bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Supplier Spend — Approved POs</h2>
+        <div className="bg-surface-1 border border-border-0">
+          <div className="flex items-center px-5 h-11 border-b border-border-0">
+            <span className="text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest">
+              Supplier Spend — Approved
+            </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="text-left border-b border-gray-100">
-                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Supplier</th>
-                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-right">Total Spend</th>
-                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-right">POs</th>
-                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-right">Items</th>
-                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Share</th>
+                <tr className="border-b border-border-0">
+                  {["Supplier", "Total Spend", "POs", "Items", "Share"].map((h, i) => (
+                    <th key={h} className={`px-5 py-2.5 text-2xs font-mono font-medium text-text-tertiary uppercase tracking-widest ${i > 0 ? "text-right" : "text-left"}`}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {supplierRows.map(([supplier, data]) => {
                   const share = totalCost > 0 ? (data.spend / totalCost) * 100 : 0;
                   return (
-                    <tr key={supplier} className="border-b border-gray-50 last:border-0 hover:bg-brand-sage/10">
-                      <td className="px-5 py-3 font-medium text-gray-800">{supplier}</td>
-                      <td className="px-5 py-3 text-right font-semibold text-brand-green">{fmt(data.spend)}</td>
-                      <td className="px-5 py-3 text-right text-gray-500">{data.poCount}</td>
-                      <td className="px-5 py-3 text-right text-gray-500">{data.items}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <tr key={supplier} className="border-t border-border-0 hover:bg-surface-2 transition-colors">
+                      <td className="px-5 py-2.5 font-sans text-sm text-text-primary">{supplier}</td>
+                      <td className="px-5 py-2.5 font-mono text-sm text-text-primary tabular-nums text-right font-medium">{fmt(data.spend)}</td>
+                      <td className="px-5 py-2.5 font-mono text-sm text-text-secondary tabular-nums text-right">{data.poCount}</td>
+                      <td className="px-5 py-2.5 font-mono text-sm text-text-secondary tabular-nums text-right">{data.items}</td>
+                      <td className="px-5 py-2.5">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Hard bar — no rounded-full */}
+                          <div className="w-20 h-1 bg-surface-3 overflow-hidden">
                             <div
-                              className="h-full bg-brand-green rounded-full"
+                              className="h-full bg-accent transition-all duration-300"
                               style={{ width: `${Math.min(share, 100)}%` }}
                             />
                           </div>
-                          <span className="text-xs text-gray-400 w-10 text-right">{share.toFixed(0)}%</span>
+                          <span className="font-mono text-xs text-text-tertiary w-8 text-right tabular-nums">{share.toFixed(0)}%</span>
                         </div>
                       </td>
                     </tr>
@@ -459,6 +439,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
