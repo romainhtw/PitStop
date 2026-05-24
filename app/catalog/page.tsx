@@ -354,7 +354,7 @@ export default function CatalogPage() {
       ) : products.length === 0 ? (
         <div className="text-center py-24 bg-surface-1 border border-border-0">
           <p className="text-text-primary font-medium mb-1">No products yet</p>
-          <p className="text-text-tertiary text-sm mb-6 font-mono">Click "Sync Now" to pull your active Shopify products</p>
+          <p className="text-text-tertiary text-sm mb-6 font-mono">Click &ldquo;Sync Now&rdquo; to pull your active Shopify products</p>
           <button
             onClick={handleSync}
             disabled={syncing}
