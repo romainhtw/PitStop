@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { requireEnv } from "@/lib/requireEnv";
 import { resetPeriodUsage } from "@/lib/stripe/usageTracking";
+import { planToTier } from "@/lib/billing/tiers";
+import { invalidateSubscriptionCache } from "@/lib/billing/enforce-subscription";
 
 export const runtime = "nodejs";
 
@@ -18,6 +21,40 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Webhook verification failed";
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  // ── Idempotency guard ─────────────────────────────────────────────────────
+  const eventRef = adminDb.collection("stripeEvents").doc(event.id);
+  const seen = await eventRef.get();
+  if (seen.exists) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+  await eventRef.set({ type: event.type, processedAt: FieldValue.serverTimestamp() });
+
+  // ── Helper: sync tier to merchant doc (multi-tenant) ─────────────────────
+  async function syncMerchantTier(
+    customerId: string,
+    subscriptionId: string,
+    plan: string,
+    status: string,
+    periodEnd: number | undefined,
+  ) {
+    const tier = planToTier(plan);
+    const snap = await adminDb
+      .collection("merchants")
+      .where("stripeCustomerId", "==", customerId)
+      .limit(1)
+      .get();
+    if (snap.empty) return;
+    const merchantId = snap.docs[0].id;
+    await snap.docs[0].ref.update({
+      subscriptionTier:            tier,
+      subscriptionStatus:          status,
+      stripeSubscriptionId:        subscriptionId,
+      subscriptionCurrentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
+      updatedAt:                   FieldValue.serverTimestamp(),
+    });
+    invalidateSubscriptionCache(merchantId);
   }
 
   try {
@@ -59,6 +96,15 @@ export async function POST(req: NextRequest) {
           updatedAt: new Date().toISOString(),
         }, { merge: true });
 
+        // Sync tier to merchant doc (multi-tenant)
+        await syncMerchantTier(
+          session.customer as string,
+          session.subscription as string,
+          plan,
+          sub.status,
+          rawEnd,
+        );
+
         // ── REFERRAL DETECTION ──────────────────────────────────────────
         const discountEntry = session.total_details?.breakdown?.discounts?.[0];
         const promoCodeRef = (discountEntry?.discount as unknown as Record<string, unknown>)?.promotion_code;
@@ -89,6 +135,34 @@ export async function POST(req: NextRequest) {
           currentPeriodEnd: rawEnd ? new Date(rawEnd * 1000).toISOString() : "",
           updatedAt: new Date().toISOString(),
         }, { merge: true });
+
+        // Sync tier to merchant doc (multi-tenant)
+        await syncMerchantTier(
+          sub.customer as string,
+          sub.id,
+          plan,
+          sub.status,
+          rawEnd,
+        );
+        break;
+      }
+
+      // ── PAYMENT FAILED ──────────────────────────────────────────────────
+      case "invoice.payment_failed": {
+        const inv = event.data.object as Stripe.Invoice;
+        const failSnap = await adminDb
+          .collection("merchants")
+          .where("stripeCustomerId", "==", inv.customer as string)
+          .limit(1)
+          .get();
+        if (!failSnap.empty) {
+          const merchantId = failSnap.docs[0].id;
+          await failSnap.docs[0].ref.update({
+            subscriptionStatus: "past_due",
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          invalidateSubscriptionCache(merchantId);
+        }
         break;
       }
 
