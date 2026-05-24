@@ -168,7 +168,23 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             <span className="font-mono text-2xs tracking-widest">{VIEW_LABELS[viewMode]}</span>
             <span>View mode</span>
           </button>
-          <p className="px-5 pb-3 text-2xs font-mono text-text-tertiary opacity-50">Perth · WA</p>
+          <p className="px-5 pb-1 text-2xs font-mono text-text-tertiary opacity-50">Perth · WA</p>
+          {/* Arc Labs credit */}
+          <div className="px-5 pb-3 flex items-center gap-1.5 opacity-30 hover:opacity-50 transition-opacity">
+            {/* Cocarde / rosette — pink, 8-petal */}
+            <svg width="10" height="10" viewBox="0 0 20 20" fill="#FF69B4" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="10" cy="5.5" rx="2" ry="3.5"/>
+              <ellipse cx="10" cy="14.5" rx="2" ry="3.5"/>
+              <ellipse cx="5.5" cy="10" rx="3.5" ry="2"/>
+              <ellipse cx="14.5" cy="10" rx="3.5" ry="2"/>
+              <ellipse cx="6.9" cy="6.9" rx="2" ry="3.5" transform="rotate(45 6.9 6.9)"/>
+              <ellipse cx="13.1" cy="6.9" rx="2" ry="3.5" transform="rotate(-45 13.1 6.9)"/>
+              <ellipse cx="6.9" cy="13.1" rx="2" ry="3.5" transform="rotate(-45 6.9 13.1)"/>
+              <ellipse cx="13.1" cy="13.1" rx="2" ry="3.5" transform="rotate(45 13.1 13.1)"/>
+              <circle cx="10" cy="10" r="2.5"/>
+            </svg>
+            <span className="text-2xs font-mono text-text-tertiary">built by Arc Labs</span>
+          </div>
         </div>
       </aside>
     </>

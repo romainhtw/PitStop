@@ -215,7 +215,7 @@ export default function DashboardPage() {
           <p className="text-xs text-text-tertiary mt-0.5 font-mono">Inventory at a glance</p>
         </div>
         <div className="flex items-center gap-2">
-          <FeedbackChat context={PO_CHAT_CONTEXT} buttonLabel="Request a change" />
+          <FeedbackChat context={PO_CHAT_CONTEXT} buttonLabel="Help · Feedback" />
           <Link href="/purchase-orders/new">
             <Button variant="primary" size="sm">+ New Order</Button>
           </Link>

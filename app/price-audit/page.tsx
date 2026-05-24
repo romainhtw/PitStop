@@ -178,7 +178,7 @@ export default function PriceAuditPage() {
           <p className="text-text-secondary text-sm font-mono">Price consistency and data health checks.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <FeedbackChat context={AUDIT_CHAT_CONTEXT} buttonLabel="Add audit checks" />
+          <FeedbackChat context={AUDIT_CHAT_CONTEXT} buttonLabel="Help · Feedback" />
           {activeTab === "prices" && (
             <button
               onClick={handleScan}
