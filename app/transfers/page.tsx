@@ -165,22 +165,22 @@ export default function TransfersPage() {
   const tabCls = (t: Tab) =>
     `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
       tab === t
-        ? "border-brand-green text-brand-green"
-        : "border-transparent text-gray-400 hover:text-gray-600"
+        ? "border-accent text-accent"
+        : "border-transparent text-text-tertiary hover:text-text-secondary"
     }`;
 
   return (
     <div className="p-6 max-w-4xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-display text-4xl leading-none tracking-wide text-brand-green mb-1">
+        <h1 className="font-display text-4xl leading-none tracking-wide text-accent mb-1">
           Stock Transfers
         </h1>
-        <p className="text-gray-400 text-sm">Move inventory between In-Store and Warehouse.</p>
+        <p className="text-text-tertiary text-sm">Move inventory between In-Store and Warehouse.</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-100 mb-6">
+      <div className="flex border-b border-border-0 mb-6">
         <button className={tabCls("new")} onClick={() => setTab("new")}>New Transfer</button>
         <button className={tabCls("history")} onClick={() => setTab("history")}>History</button>
       </div>
@@ -203,10 +203,10 @@ export default function TransfersPage() {
           )}
 
           {/* Location selector */}
-          <div className="bg-white rounded-lg border border-gray-100 p-5">
+          <div className="bg-surface-1 border border-border-0 p-5">
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">From</label>
+                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest block mb-1.5">From</label>
                 <select
                   value={fromLocation}
                   onChange={(e) => {
@@ -215,7 +215,7 @@ export default function TransfersPage() {
                     setFromLocation(val);
                     setDraftItems([]);
                   }}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-brand-green"
+                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 >
                   {LOCATIONS.map((l) => (
                     <option key={l} value={l} disabled={l === toLocation}>{l}</option>
@@ -226,7 +226,7 @@ export default function TransfersPage() {
               <button
                 onClick={swapLocations}
                 title="Swap locations"
-                className="mt-5 p-2 rounded-full border border-gray-200 hover:border-brand-green hover:text-brand-green text-gray-400 transition-colors"
+                className="mt-5 p-2 rounded-full border border-border-1 hover:border-accent hover:text-accent text-text-tertiary transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -234,7 +234,7 @@ export default function TransfersPage() {
               </button>
 
               <div className="flex-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">To</label>
+                <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest block mb-1.5">To</label>
                 <select
                   value={toLocation}
                   onChange={(e) => {
@@ -243,7 +243,7 @@ export default function TransfersPage() {
                     setToLocation(val);
                     setDraftItems([]);
                   }}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-brand-green"
+                  className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 >
                   {LOCATIONS.map((l) => (
                     <option key={l} value={l} disabled={l === fromLocation}>{l}</option>
@@ -254,8 +254,8 @@ export default function TransfersPage() {
           </div>
 
           {/* Product search */}
-          <div className="bg-white rounded-lg border border-gray-100 p-5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
+          <div className="bg-surface-1 border border-border-0 p-5">
+            <label className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest block mb-2">
               Add Products
             </label>
             <div className="relative">
@@ -266,12 +266,12 @@ export default function TransfersPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 disabled={catalogLoading}
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-brand-green pr-8"
+                className="w-full border border-border-1 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent pr-8 bg-surface-2 text-text-primary placeholder:text-text-tertiary"
               />
               {search && (
                 <button
                   onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary"
                 >
                   ✕
                 </button>
@@ -280,7 +280,7 @@ export default function TransfersPage() {
 
             {/* Search results dropdown */}
             {searchResults.length > 0 && (
-              <div className="mt-1 border border-gray-100 rounded-lg shadow-sm divide-y divide-gray-50 max-h-64 overflow-y-auto">
+              <div className="mt-1 border border-border-0 rounded-lg shadow-sm divide-y divide-border-0 max-h-64 overflow-y-auto">
                 {searchResults.map((p) => {
                   const onHandFrom =
                     fromLocation === "In-Store Fitzgerald St"
@@ -290,16 +290,16 @@ export default function TransfersPage() {
                     <button
                       key={p.variantId}
                       onClick={() => addItem(p)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-brand-sage/10 transition-colors"
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-surface-2 transition-colors"
                     >
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{p.productTitle}</div>
+                        <div className="text-sm font-medium text-text-primary">{p.productTitle}</div>
                         {p.variantTitle && p.variantTitle !== "Default Title" && (
-                          <div className="text-xs text-gray-400">{p.variantTitle}</div>
+                          <div className="text-xs text-text-tertiary">{p.variantTitle}</div>
                         )}
-                        <div className="text-xs text-gray-400 font-mono">{p.sku}</div>
+                        <div className="text-xs text-text-tertiary font-mono">{p.sku}</div>
                       </div>
-                      <div className="text-xs text-gray-400 shrink-0 ml-4">
+                      <div className="text-xs text-text-tertiary shrink-0 ml-4">
                         {onHandFrom} on hand
                       </div>
                     </button>
@@ -309,34 +309,34 @@ export default function TransfersPage() {
             )}
 
             {search.trim() && !catalogLoading && searchResults.length === 0 && (
-              <p className="mt-2 text-xs text-gray-400">No matching products found.</p>
+              <p className="mt-2 text-xs text-text-tertiary">No matching products found.</p>
             )}
           </div>
 
           {/* Draft items table */}
           {draftItems.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+            <div className="bg-surface-1 border border-border-0 overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
+                <thead className="bg-surface-1 border-b border-border-0">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Product</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Available</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Transfer Qty</th>
+                    <th className="px-4 py-3 text-left font-medium text-text-secondary">Product</th>
+                    <th className="px-4 py-3 text-right font-medium text-text-secondary">Available</th>
+                    <th className="px-4 py-3 text-right font-medium text-text-secondary">Transfer Qty</th>
                     <th className="px-4 py-3 w-8" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border-0">
                   {draftItems.map((item) => (
                     <tr key={item.inventoryItemId}>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{item.name}</div>
+                        <div className="font-medium text-text-primary">{item.name}</div>
                         {item.variantTitle && item.variantTitle !== "Default Title" && (
-                          <div className="text-xs text-gray-400">{item.variantTitle}</div>
+                          <div className="text-xs text-text-tertiary">{item.variantTitle}</div>
                         )}
-                        <div className="text-xs font-mono text-gray-400">{item.sku}</div>
+                        <div className="text-xs font-mono text-text-tertiary">{item.sku}</div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`font-semibold ${item.qty > item.onHandFrom ? "text-red-500" : "text-gray-700"}`}>
+                        <span className={`font-semibold ${item.qty > item.onHandFrom ? "text-red-500" : "text-text-primary"}`}>
                           {item.onHandFrom}
                         </span>
                       </td>
@@ -347,15 +347,15 @@ export default function TransfersPage() {
                           max={item.onHandFrom || 9999}
                           value={item.qty}
                           onChange={(e) => updateQty(item.inventoryItemId, parseInt(e.target.value) || 1)}
-                          className={`w-20 border rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-brand-green ${
-                            item.qty > item.onHandFrom ? "border-red-300 bg-red-50" : "border-gray-200"
+                          className={`w-20 border rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-accent bg-surface-2 text-text-primary placeholder:text-text-tertiary ${
+                            item.qty > item.onHandFrom ? "border-red-300 bg-red-50" : "border-border-1"
                           }`}
                         />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => removeItem(item.inventoryItemId)}
-                          className="text-gray-300 hover:text-red-400 transition-colors text-lg leading-none"
+                          className="text-text-tertiary hover:text-red-400 transition-colors text-lg leading-none"
                           title="Remove"
                         >
                           ×
@@ -373,15 +373,15 @@ export default function TransfersPage() {
                 </div>
               )}
 
-              <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-xs text-gray-400">
+              <div className="px-4 py-3 border-t border-border-0 flex items-center justify-between">
+                <span className="text-xs text-text-tertiary">
                   {draftItems.length} SKU{draftItems.length !== 1 ? "s" : ""} ·{" "}
                   {draftItems.reduce((s, d) => s + d.qty, 0)} units total
                 </span>
                 <button
                   onClick={handleSubmit}
                   disabled={submitting || draftItems.some((d) => d.qty > d.onHandFrom)}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded bg-brand-green text-white text-sm font-medium disabled:opacity-50 hover:bg-brand-green/90 transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded bg-accent text-white text-sm font-medium disabled:opacity-50 hover:bg-accent-dim transition-colors"
                 >
                   {submitting ? (
                     <>
@@ -397,7 +397,7 @@ export default function TransfersPage() {
           )}
 
           {draftItems.length === 0 && !submitResult && (
-            <p className="text-sm text-gray-300 text-center py-4">
+            <p className="text-sm text-text-tertiary text-center py-4">
               Search for products above to build your transfer list.
             </p>
           )}
@@ -408,26 +408,26 @@ export default function TransfersPage() {
       {tab === "history" && (
         <div>
           {historyLoading ? (
-            <div className="flex items-center justify-center h-40 text-gray-400 text-sm gap-2">
-              <span className="w-4 h-4 border-2 border-gray-200 border-t-brand-green rounded-full animate-spin" />
+            <div className="flex items-center justify-center h-40 text-text-tertiary text-sm gap-2">
+              <span className="w-4 h-4 border-2 border-border-1 border-t-accent rounded-full animate-spin" />
               Loading…
             </div>
           ) : history.length === 0 ? (
-            <div className="text-center py-16 text-gray-300 text-sm">No transfers yet.</div>
+            <div className="text-center py-16 text-text-tertiary text-sm">No transfers yet.</div>
           ) : (
             <div className="space-y-3">
               {history.map((rec) => (
-                <div key={rec.id} className="bg-white rounded-lg border border-gray-100 p-4">
+                <div key={rec.id} className="bg-surface-1 border border-border-0 p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900">{rec.fromLocation}</span>
-                        <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <span className="font-medium text-text-primary">{rec.fromLocation}</span>
+                        <svg className="w-4 h-4 text-text-tertiary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                         </svg>
-                        <span className="font-medium text-gray-900">{rec.toLocation}</span>
+                        <span className="font-medium text-text-primary">{rec.toLocation}</span>
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{fmtDate(rec.executedAt)}</div>
+                      <div className="text-xs text-text-tertiary mt-0.5">{fmtDate(rec.executedAt)}</div>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                       rec.status === "done"
@@ -444,27 +444,27 @@ export default function TransfersPage() {
 
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-gray-400">
+                      <tr className="text-text-tertiary">
                         <th className="text-left font-medium pb-1">Product</th>
                         <th className="text-left font-medium pb-1">SKU</th>
                         <th className="text-right font-medium pb-1">Qty</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-border-0">
                       {rec.items.map((item, i) => (
                         <tr key={i}>
-                          <td className="py-1 text-gray-700">{item.name}</td>
-                          <td className="py-1 font-mono text-gray-400">{item.sku}</td>
-                          <td className="py-1 text-right font-semibold text-gray-900">{item.qty}</td>
+                          <td className="py-1 text-text-primary">{item.name}</td>
+                          <td className="py-1 font-mono text-text-tertiary">{item.sku}</td>
+                          <td className="py-1 text-right font-semibold text-text-primary">{item.qty}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  <div className="mt-2 pt-2 border-t border-gray-50 flex justify-between text-xs text-gray-400">
+                  <div className="mt-2 pt-2 border-t border-border-0 flex justify-between text-xs text-text-tertiary">
                     <span>{rec.items.length} SKU{rec.items.length !== 1 ? "s" : ""} · {rec.items.reduce((s, i) => s + i.qty, 0)} units</span>
                     {rec.shopifyGroupId && (
-                      <span className="font-mono text-gray-300 truncate ml-4">
+                      <span className="font-mono text-text-tertiary truncate ml-4">
                         Shopify: {rec.shopifyGroupId.split("/").pop()}
                       </span>
                     )}
