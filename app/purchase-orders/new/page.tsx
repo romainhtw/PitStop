@@ -44,30 +44,30 @@ function ParseProgress({ filename }: { filename: string | null }) {
   return (
     <div className="flex flex-col items-center gap-5 w-full max-w-sm mx-auto">
       {/* Percentage */}
-      <div className="text-5xl font-display font-bold text-brand-green tabular-nums leading-none">
+      <div className="text-5xl font-display font-bold text-accent tabular-nums leading-none">
         {pct}<span className="text-2xl">%</span>
       </div>
 
       {/* Progress bar */}
-      <div className="w-full h-1.5 bg-brand-sage/30 rounded-full overflow-hidden">
+      <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
         <div
-          className="h-full bg-brand-green rounded-full transition-all duration-300 ease-out"
+          className="h-full bg-accent rounded-full transition-all duration-300 ease-out"
           style={{ width: `${pct}%` }}
         />
       </div>
 
       {/* Step label with pulsing dot */}
-      <div className="flex items-center gap-2 text-sm text-gray-500">
+      <div className="flex items-center gap-2 text-sm text-text-secondary">
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-green opacity-60" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-green" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-60" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
         </span>
-        <span className="font-medium text-brand-green">{label}&hellip;</span>
+        <span className="font-medium text-accent">{label}&hellip;</span>
       </div>
 
       {/* Filename */}
       {filename && (
-        <p className="text-xs text-gray-400 truncate max-w-full px-4">{filename}</p>
+        <p className="text-xs text-text-tertiary truncate max-w-full px-4">{filename}</p>
       )}
     </div>
   );
@@ -119,10 +119,10 @@ export default function NewPurchaseOrderPage() {
   return (
     <div className="p-10 max-w-4xl">
       <div className="mb-4"><BackButton /></div>
-      <h1 className="font-display text-4xl leading-none tracking-wide text-brand-green mb-2">
+      <h1 className="font-display text-4xl leading-none tracking-wide text-text-primary mb-2">
         New Purchase Order
       </h1>
-      <p className="text-gray-500 mb-8 text-sm">
+      <p className="text-text-secondary mb-8 text-sm">
         Drop a supplier invoice PDF below — we&apos;ll extract the line items for you to review.
       </p>
 
@@ -136,12 +136,12 @@ export default function NewPurchaseOrderPage() {
           if (file) handleFile(file);
         }}
         onClick={() => !loading && inputRef.current?.click()}
-        className={`rounded-lg border-2 border-dashed py-16 px-12 text-center transition-colors ${
+        className={`border-2 border-dashed py-16 px-12 text-center transition-colors ${
           loading
-            ? "border-brand-sage bg-brand-sage/10 cursor-default"
+            ? "border-border-1 bg-surface-1 cursor-default"
             : dragging
-            ? "border-brand-green bg-brand-sage/40 cursor-copy"
-            : "border-brand-sage bg-white hover:border-brand-green hover:bg-brand-sage/20 cursor-pointer"
+            ? "border-accent bg-surface-2 cursor-copy"
+            : "border-border-1 bg-surface-1 hover:border-accent hover:bg-surface-2 cursor-pointer"
         }`}
       >
         <input
@@ -159,11 +159,11 @@ export default function NewPurchaseOrderPage() {
           <ParseProgress filename={filename} />
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <svg className="w-10 h-10 text-brand-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-10 h-10 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
             </svg>
-            <p className="text-brand-green font-semibold">Drop a PDF invoice here</p>
-            <p className="text-gray-400 text-sm">or click to choose a file</p>
+            <p className="text-text-primary font-semibold">Drop a PDF invoice here</p>
+            <p className="text-text-secondary text-sm">or click to choose a file</p>
           </div>
         )}
       </div>
