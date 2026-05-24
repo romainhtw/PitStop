@@ -144,7 +144,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Analytics: "bg-emerald-50 text-emerald-700 border-emerald-100",
   Customer: "bg-pink-50 text-pink-700 border-pink-100",
   Workshop: "bg-orange-50 text-orange-700 border-orange-100",
-  Suppliers: "bg-gray-50 text-gray-700 border-gray-200",
+  Suppliers: "bg-surface-2 text-text-secondary border-border-1",
   Custom: "bg-indigo-50 text-indigo-700 border-indigo-100",
 };
 
@@ -335,16 +335,16 @@ export default function BuildPage() {
   const categories = ALL_CATEGORIES.filter(c => visibleFeatures.some(f => f.category === c));
 
   const featureListPanel = (
-    <div className="flex flex-col h-full overflow-hidden bg-white">
-      <div className="px-5 py-4 border-b border-gray-200">
+    <div className="flex flex-col h-full overflow-hidden bg-surface-1">
+      <div className="px-5 py-4 border-b border-border-1">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-brand-green">Roadmap</h1>
-            <p className="text-xs text-gray-400 mt-0.5">{activeFeatures.length} features to build</p>
+            <h1 className="text-lg font-semibold text-accent">Roadmap</h1>
+            <p className="text-xs text-text-tertiary mt-0.5">{activeFeatures.length} features to build</p>
           </div>
           <button
             onClick={() => setShowAddForm(true)}
-            className="text-xs bg-brand-green text-white px-2.5 py-1 rounded hover:bg-brand-green/90 transition-colors font-medium"
+            className="text-xs bg-accent text-white px-2.5 py-1 rounded hover:bg-accent-dim transition-colors font-medium"
           >
             + Add
           </button>
@@ -352,7 +352,7 @@ export default function BuildPage() {
         {archivedFeatures.length > 0 && (
           <button
             onClick={() => setShowArchived(!showArchived)}
-            className="mt-2 text-[11px] text-gray-400 hover:text-brand-green transition-colors"
+            className="mt-2 text-[11px] text-text-tertiary hover:text-accent transition-colors"
           >
             {showArchived ? "← Active features" : `Show archived (${archivedFeatures.length})`}
           </button>
@@ -360,32 +360,32 @@ export default function BuildPage() {
       </div>
 
       {showAddForm && (
-        <div className="px-5 py-4 border-b border-gray-200 bg-brand-sage/10">
-          <p className="text-xs font-semibold text-gray-700 mb-2">New feature</p>
+        <div className="px-5 py-4 border-b border-border-1 bg-surface-2">
+          <p className="text-xs font-semibold text-text-secondary mb-2">New feature</p>
           <input
             type="text"
             value={newFeature.title}
             onChange={e => setNewFeature(p => ({ ...p, title: e.target.value }))}
             placeholder="Feature name"
-            className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs mb-2 focus:outline-none focus:border-brand-green"
+            className="w-full border border-border-1 bg-surface-2 text-text-primary placeholder:text-text-tertiary rounded px-2.5 py-1.5 text-xs mb-2 focus:outline-none focus:border-accent"
           />
           <textarea
             value={newFeature.description}
             onChange={e => setNewFeature(p => ({ ...p, description: e.target.value }))}
             placeholder="Short description (optional)"
             rows={2}
-            className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs mb-2 resize-none focus:outline-none focus:border-brand-green"
+            className="w-full border border-border-1 bg-surface-2 text-text-primary placeholder:text-text-tertiary rounded px-2.5 py-1.5 text-xs mb-2 resize-none focus:outline-none focus:border-accent"
           />
           <select
             value={newFeature.category}
             onChange={e => setNewFeature(p => ({ ...p, category: e.target.value }))}
-            className="w-full border border-gray-200 rounded px-2.5 py-1.5 text-xs mb-3 focus:outline-none focus:border-brand-green"
+            className="w-full border border-border-1 bg-surface-2 text-text-primary placeholder:text-text-tertiary rounded px-2.5 py-1.5 text-xs mb-3 focus:outline-none focus:border-accent"
           >
             {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <div className="flex gap-2">
-            <button onClick={addCustomFeature} className="flex-1 bg-brand-green text-white text-xs py-1.5 rounded font-medium hover:bg-brand-green/90 transition-colors">Add</button>
-            <button onClick={() => setShowAddForm(false)} className="flex-1 border border-gray-200 text-gray-500 text-xs py-1.5 rounded hover:bg-gray-50 transition-colors">Cancel</button>
+            <button onClick={addCustomFeature} className="flex-1 bg-accent text-white text-xs py-1.5 rounded font-medium hover:bg-accent-dim transition-colors">Add</button>
+            <button onClick={() => setShowAddForm(false)} className="flex-1 border border-border-1 text-text-secondary text-xs py-1.5 rounded hover:bg-surface-2 transition-colors">Cancel</button>
           </div>
         </div>
       )}
@@ -393,7 +393,7 @@ export default function BuildPage() {
       <div className="flex-1 overflow-y-auto py-3">
         {categories.map(cat => (
           <div key={cat} className="mb-4">
-            <p className="px-5 text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">{cat}</p>
+            <p className="px-5 text-[10px] font-semibold text-text-tertiary uppercase tracking-widest mb-1">{cat}</p>
             {visibleFeatures.filter(f => f.category === cat).map(feature => {
               const isArchived = !!featureStates[feature.id]?.archived;
               const isSelected = selected?.id === feature.id;
@@ -403,31 +403,31 @@ export default function BuildPage() {
               return (
                 <div
                   key={feature.id}
-                  className={`group border-l-2 transition-colors ${isSelected ? "border-brand-green bg-brand-sage/20" : "border-transparent hover:bg-gray-50"}`}
+                  className={`group border-l-2 transition-colors ${isSelected ? "border-accent bg-surface-2" : "border-transparent hover:bg-surface-2"}`}
                 >
                   <div className="px-5 py-3">
                     <div className="flex items-start gap-2">
                       <button onClick={() => !isArchived && selectFeature(feature)} className="flex-1 text-left">
-                        <p className={`text-sm font-medium ${isArchived ? "text-gray-400" : isSelected ? "text-brand-green" : "text-gray-800"}`}>
+                        <p className={`text-sm font-medium ${isArchived ? "text-text-tertiary" : isSelected ? "text-accent" : "text-text-primary"}`}>
                           {feature.title}
                           {feature.custom && <span className="ml-1.5 text-[9px] text-indigo-400 uppercase tracking-wide font-semibold">Custom</span>}
                         </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{feature.description}</p>
+                        <p className="text-[11px] text-text-tertiary mt-0.5 leading-snug">{feature.description}</p>
                       </button>
                       <div className="shrink-0 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
                         {isArchived ? (
-                          <button onClick={() => unarchiveFeature(feature.id)} title="Restore" className="text-gray-300 hover:text-brand-green text-sm">↩</button>
+                          <button onClick={() => unarchiveFeature(feature.id)} title="Restore" className="text-text-tertiary hover:text-accent text-sm">↩</button>
                         ) : (
-                          <button onClick={() => archiveFeature(feature.id)} title="Archive" className="text-gray-300 hover:text-amber-500 text-sm">▾</button>
+                          <button onClick={() => archiveFeature(feature.id)} title="Archive" className="text-text-tertiary hover:text-amber-500 text-sm">▾</button>
                         )}
                         {feature.custom && (
                           isConfirmingDelete ? (
                             <>
                               <button onClick={() => deleteFeature(feature.id)} className="text-[11px] text-red-500 font-medium">Del</button>
-                              <button onClick={() => setDeleteConfirm(null)} className="text-[11px] text-gray-400">✕</button>
+                              <button onClick={() => setDeleteConfirm(null)} className="text-[11px] text-text-tertiary">✕</button>
                             </>
                           ) : (
-                            <button onClick={() => setDeleteConfirm(feature.id)} title="Delete" className="text-gray-300 hover:text-red-500 text-sm">×</button>
+                            <button onClick={() => setDeleteConfirm(feature.id)} title="Delete" className="text-text-tertiary hover:text-red-500 text-sm">×</button>
                           )
                         )}
                       </div>
@@ -435,7 +435,7 @@ export default function BuildPage() {
                     {!isArchived && (
                       <button
                         onClick={() => setExpandedImpact(isExpanded ? null : feature.id)}
-                        className="mt-1.5 text-[10px] text-brand-green hover:underline font-medium"
+                        className="mt-1.5 text-[10px] text-accent hover:underline font-medium"
                       >
                         {isExpanded ? "Hide impact ↑" : `⚡ ${feature.impact.timeSaved}`}
                       </button>
@@ -456,13 +456,13 @@ export default function BuildPage() {
   );
 
   const chatPanel = (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#fafafa]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-canvas">
       {/* Chat header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center gap-3">
+      <div className="px-4 py-3 border-b border-border-1 bg-surface-1 flex items-center gap-3">
         {/* Back button — mobile only */}
         <button
           onClick={() => setMobileChatOpen(false)}
-          className="lg:hidden shrink-0 text-gray-400 hover:text-brand-green transition-colors p-1 -ml-1"
+          className="lg:hidden shrink-0 text-text-tertiary hover:text-accent transition-colors p-1 -ml-1"
           aria-label="Back to features"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -474,15 +474,15 @@ export default function BuildPage() {
             <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded border ${CATEGORY_COLORS[selected.category] ?? CATEGORY_COLORS.Custom}`}>
               {selected.category}
             </span>
-            <span className="text-sm font-semibold text-gray-800 truncate">{selected.title}</span>
+            <span className="text-sm font-semibold text-text-primary truncate">{selected.title}</span>
           </div>
         ) : (
-          <span className="text-sm text-gray-400">Select a feature →</span>
+          <span className="text-sm text-text-tertiary">Select a feature →</span>
         )}
         {messages.length > 0 && (
           <button
             onClick={() => { setMessages([]); setSelected(null); setBrief(null); setInput(""); setMobileChatOpen(false); }}
-            className="ml-auto shrink-0 text-xs text-gray-400 hover:text-red-500 transition-colors"
+            className="ml-auto shrink-0 text-xs text-text-tertiary hover:text-red-500 transition-colors"
           >
             Reset
           </button>
@@ -493,13 +493,13 @@ export default function BuildPage() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0 overscroll-contain">
         {messages.length === 0 && !streaming && (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
-            <div className="w-12 h-12 rounded-full bg-brand-sage/40 flex items-center justify-center mb-4">
-              <svg className="w-6 h-6 text-brand-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-sm font-medium text-gray-600">Feature Discovery</p>
-            <p className="text-xs text-gray-400 mt-1 max-w-xs">
+            <p className="text-sm font-medium text-text-secondary">Feature Discovery</p>
+            <p className="text-xs text-text-tertiary mt-1 max-w-xs">
               Tap a feature on the list. We&apos;ll ask a few questions then send a brief to Romain on WhatsApp.
             </p>
           </div>
@@ -510,7 +510,7 @@ export default function BuildPage() {
           if (msg.role === "user") {
             return (
               <div key={i} className="flex justify-end">
-                <div className="max-w-[85%] bg-brand-green rounded-2xl rounded-tr-sm px-4 py-3 text-sm text-white leading-relaxed whitespace-pre-wrap">
+                <div className="max-w-[85%] bg-accent rounded-2xl rounded-tr-sm px-4 py-3 text-sm text-white leading-relaxed whitespace-pre-wrap">
                   {msg.content}
                 </div>
               </div>
@@ -518,7 +518,7 @@ export default function BuildPage() {
           }
           return (
             <div key={i} className="flex justify-start">
-              <div className="max-w-[85%] bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+              <div className="max-w-[85%] bg-surface-1 border border-border-1 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
                 {msg.content}
                 {streaming && isLast && (
                   <span className="inline-block w-1.5 h-4 bg-gray-300 ml-0.5 animate-pulse align-middle" />
@@ -529,10 +529,10 @@ export default function BuildPage() {
         })}
 
         {brief && (
-          <div className="bg-white border border-brand-green/30 rounded-xl p-4 mt-2">
+          <div className="bg-surface-1 border border-accent/30 rounded-xl p-4 mt-2">
             <div className="flex flex-col gap-3">
-              <span className="text-xs font-semibold text-brand-green uppercase tracking-widest">Brief Ready</span>
-              <pre className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap font-sans">{brief}</pre>
+              <span className="text-xs font-semibold text-accent uppercase tracking-widest">Brief Ready</span>
+              <pre className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap font-sans">{brief}</pre>
               <button
                 onClick={openWhatsApp}
                 className="w-full inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20c05c] text-white text-sm font-semibold py-3 rounded-xl transition-colors"
@@ -551,7 +551,7 @@ export default function BuildPage() {
 
       {/* Input or WhatsApp CTA */}
       {selected && (
-        <div className="px-4 py-3 border-t border-gray-200 bg-white">
+        <div className="px-4 py-3 border-t border-border-1 bg-surface-1">
           {brief ? (
             <button
               onClick={openWhatsApp}
@@ -571,12 +571,12 @@ export default function BuildPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="Type your answer…"
                 rows={2}
-                className="flex-1 resize-none border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-brand-green transition-colors"
+                className="flex-1 resize-none border border-border-1 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent transition-colors"
               />
               <button
                 onClick={send}
                 disabled={!input.trim() || streaming}
-                className="shrink-0 w-10 h-10 flex items-center justify-center bg-brand-green hover:bg-brand-green/90 disabled:opacity-50 text-white rounded-xl transition-colors"
+                className="shrink-0 w-10 h-10 flex items-center justify-center bg-accent hover:bg-accent-dim disabled:opacity-50 text-white rounded-xl transition-colors"
               >
                 {streaming ? <Spinner /> : (
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -600,7 +600,7 @@ export default function BuildPage() {
 
       {/* Desktop: side by side */}
       <div className="hidden lg:flex h-screen overflow-hidden">
-        <div className="w-72 shrink-0 border-r border-gray-200 flex flex-col overflow-hidden">
+        <div className="w-72 shrink-0 border-r border-border-1 flex flex-col overflow-hidden">
           {featureListPanel}
         </div>
         {chatPanel}
