@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { v4 as uuidv4 } from "uuid";
 import { waitUntil } from "@vercel/functions";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { recordInvoiceUsage } from "@/lib/stripe/usageTracking";
 import type { PurchaseOrder } from "@/lib/types";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -234,6 +235,13 @@ export async function POST(req: NextRequest) {
     console.log("[parse-invoice] Saving to Firestore, poId:", poId);
     await adminDb.collection("purchaseOrders").doc(poId).set(po);
     console.log("[parse-invoice] Saved to Firestore OK");
+
+    // Track usage + Stripe overage in background (non-blocking)
+    waitUntil(
+      recordInvoiceUsage().catch((err) =>
+        console.error("[parse-invoice] Usage tracking failed:", err)
+      )
+    );
 
     // Upsert supplier in background — use waitUntil so Vercel doesn't freeze before the write completes
     if (parsed.supplier) {
