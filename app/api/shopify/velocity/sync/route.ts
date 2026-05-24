@@ -66,7 +66,7 @@ async function fetchOrdersPage(sinceIso: string, pageInfo?: string): Promise<{
 
 export async function POST() {
   try {
-    const windowDays = 90;
+    const windowDays = 60;
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     const sinceIso = since.toISOString();
 
