@@ -17,6 +17,7 @@ export interface TransferItem {
 
 export interface TransferRecord {
   id: string;
+  merchantId?: string;
   fromLocation: TransferLocation;
   toLocation: TransferLocation;
   items: TransferItem[];
@@ -33,9 +34,15 @@ function locationGid(loc: TransferLocation): string {
   return toLocationGid(process.env.SHOPIFY_LOCATION_ID_WAREHOUSE);
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const snap = await adminDb.collection("transfers").orderBy("executedAt", "desc").limit(100).get();
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const snap = await adminDb
+      .collection("transfers")
+      .where("merchantId", "==", merchantId)
+      .orderBy("executedAt", "desc")
+      .limit(100)
+      .get();
     const records = snap.docs.map((d) => d.data() as TransferRecord);
     return NextResponse.json(records);
   } catch (err) {
@@ -48,6 +55,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const body = await req.json() as {
       fromLocation: TransferLocation;
       toLocation: TransferLocation;
@@ -88,6 +96,7 @@ export async function POST(req: NextRequest) {
     if (userErrors.length > 0) {
       const record: TransferRecord = {
         id,
+        merchantId,
         fromLocation,
         toLocation,
         items,
@@ -101,6 +110,7 @@ export async function POST(req: NextRequest) {
 
     const record: TransferRecord = {
       id,
+      merchantId,
       fromLocation,
       toLocation,
       items,

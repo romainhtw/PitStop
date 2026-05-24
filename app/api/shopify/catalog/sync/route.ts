@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { fetchAllActiveVariants, fetchInventoryLevels, toLocationGid } from "@/lib/shopify";
 import type { ShopifyProduct } from "@/lib/types";
@@ -6,8 +6,9 @@ import type { ShopifyProduct } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     if (!process.env.SHOPIFY_STORE_DOMAIN || !process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
       return NextResponse.json({ error: "Shopify credentials not configured" }, { status: 500 });
     }
@@ -58,6 +59,7 @@ export async function POST() {
       const storeLevel = storeMap.get(v.inventoryItemId);
       const product: ShopifyProduct = {
         ...v,
+        merchantId,
         syncedAt,
         onHandQtyStore: storeLevel?.onHandQty ?? 0,
         onHandQtyWarehouse: warehouseMap.get(v.inventoryItemId) ?? 0,

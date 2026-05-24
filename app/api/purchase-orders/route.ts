@@ -7,10 +7,12 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const url = new URL(req.url);
     const limitParam = Math.min(parseInt(url.searchParams.get("limit") ?? "100"), 200);
     const snap = await adminDb
       .collection("purchaseOrders")
+      .where("merchantId", "==", merchantId)
       .orderBy("createdAt", "desc")
       .limit(limitParam)
       .get();
@@ -24,12 +26,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const body = (await req.json()) as Partial<PurchaseOrder>;
     const now = new Date().toISOString();
     const id = body.id || uuidv4();
 
     const po: PurchaseOrder = {
       id,
+      merchantId,
       supplier: body.supplier || "",
       invoiceNumber: body.invoiceNumber || "",
       invoiceDate: body.invoiceDate || "",

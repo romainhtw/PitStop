@@ -88,6 +88,7 @@ function allocateLandedCosts(
 
 export async function POST(req: NextRequest) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     type SyncOverride = { variantId: string; inventoryItemId: string; productTitle: string };
     const { poId, dryRun, overrides } = (await req.json()) as {
       poId: string;
@@ -106,6 +107,9 @@ export async function POST(req: NextRequest) {
     const poSnap = await poRef.get();
     if (!poSnap.exists) return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
     const po = poSnap.data() as PurchaseOrder;
+    if (po.merchantId && po.merchantId !== merchantId) {
+      return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
+    }
 
     // ── Idempotency guard — reject re-sync on already-approved POs ──────
     if (!dryRun && po.status === "approved" && po.syncResult) {
@@ -120,6 +124,7 @@ export async function POST(req: NextRequest) {
     // ── Duplicate invoice detection ──────────────────────────────────────
     if (po.invoiceNumber) {
       const dupSnap = await adminDb.collection("purchaseOrders")
+        .where("merchantId", "==", merchantId)
         .where("invoiceNumber", "==", po.invoiceNumber)
         .where("supplier", "==", po.supplier)
         .where("status", "==", "approved")
@@ -180,8 +185,8 @@ export async function POST(req: NextRequest) {
           result.inventoryItemId = override.inventoryItemId;
           result.shopifyProductTitle = override.productTitle;
           if (!dryRun) {
-            if (item.sku) await saveMapping(po.supplier, item.sku, override);
-            if (item.barcode) await saveMapping(po.supplier, item.barcode, override);
+            if (item.sku) await saveMapping(merchantId, po.supplier, item.sku, override);
+            if (item.barcode) await saveMapping(merchantId, po.supplier, item.barcode, override);
           }
         } else if (!item.sku) {
           result.errorMessage = "No SKU/barcode on this line item";
@@ -189,9 +194,9 @@ export async function POST(req: NextRequest) {
             result.suggestions = await enrichedTitleSearch(item.name, item.optionValues);
           }
         } else {
-          const skuMapping = await lookupMapping(po.supplier, item.sku);
+          const skuMapping = await lookupMapping(merchantId, po.supplier, item.sku);
           const barcodeMapping = !skuMapping && item.barcode
-            ? await lookupMapping(po.supplier, item.barcode)
+            ? await lookupMapping(merchantId, po.supplier, item.barcode)
             : null;
           const knownMatch = skuMapping ?? barcodeMapping;
 
@@ -218,8 +223,8 @@ export async function POST(req: NextRequest) {
               if (missing.length > 0) result.shopifyMissingFields = missing;
               if (!dryRun) {
                 const matchData = { variantId: variant.id, inventoryItemId: variant.inventoryItem.id, productTitle: variant.product?.title ?? "" };
-                if (item.sku) await saveMapping(po.supplier, item.sku, matchData);
-                if (item.barcode) await saveMapping(po.supplier, item.barcode, matchData);
+                if (item.sku) await saveMapping(merchantId, po.supplier, item.sku, matchData);
+                if (item.barcode) await saveMapping(merchantId, po.supplier, item.barcode, matchData);
               }
             } else if (dryRun) {
               result.suggestions = await enrichedTitleSearch(item.name, item.optionValues);
@@ -401,6 +406,7 @@ export async function POST(req: NextRequest) {
     if (syncResult.successCount > 0) {
       const auditLog: AuditLog = {
         id: `${poId}_${Date.now()}`,
+        merchantId,
         poId,
         supplier: po.supplier,
         invoiceNumber: po.invoiceNumber,

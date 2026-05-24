@@ -6,15 +6,20 @@ import { adjustInventory, toLocationGid } from "@/lib/shopify";
 export const runtime = "nodejs";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const snap = await adminDb.collection("purchaseOrders").doc(params.id).get();
     if (!snap.exists) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(snap.data() as PurchaseOrder);
+    const data = snap.data() as PurchaseOrder;
+    if (data.merchantId && data.merchantId !== merchantId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -26,6 +31,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const body = (await req.json()) as Partial<PurchaseOrder>;
     const ref = adminDb.collection("purchaseOrders").doc(params.id);
     const existing = await ref.get();
@@ -34,11 +40,17 @@ export async function PUT(
       return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
     }
 
+    const existingData = existing.data() as PurchaseOrder;
+    if (existingData.merchantId && existingData.merchantId !== merchantId) {
+      return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
+    }
+
     const now = new Date().toISOString();
     const merged: PurchaseOrder = {
-      ...(existing.data() as PurchaseOrder),
+      ...existingData,
       ...body,
       id: params.id,
+      merchantId,
       updatedAt: now,
     };
 
@@ -51,15 +63,19 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const ref = adminDb.collection("purchaseOrders").doc(params.id);
     const snap = await ref.get();
 
     if (snap.exists) {
       const po = snap.data() as PurchaseOrder;
+      if (po.merchantId && po.merchantId !== merchantId) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
       const syncedItems = (po.syncResult?.results ?? []).filter(
         (r) => r.status === "synced" && r.inventoryItemId && r.delta
       );

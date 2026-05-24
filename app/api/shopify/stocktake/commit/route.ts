@@ -11,6 +11,7 @@ interface CommitItem {
 
 export async function POST(req: NextRequest) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const { items, locationId }: { items: CommitItem[]; locationId: string } = await req.json();
 
     if (!items?.length) return NextResponse.json({ error: "No items provided" }, { status: 400 });
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true, message: "All counts match current Shopify levels — nothing to update." });
     }
 
-    const referenceDocumentUri = `gid://elite-racing/Stocktake/ST-${new Date().toISOString().slice(0, 10)}-${Date.now()}`;
+    const referenceDocumentUri = `gid://${merchantId}/Stocktake/ST-${new Date().toISOString().slice(0, 10)}-${Date.now()}`;
 
     const { userErrors, groupId } = await batchAdjustInventory(
       changes.map((c) => ({ inventoryItemId: c.inventoryItemId, locationId: c.locationId, delta: c.delta })),

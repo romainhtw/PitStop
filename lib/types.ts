@@ -89,6 +89,7 @@ export interface SyncResult {
 
 export interface InventoryEntry {
   id: string;
+  merchantId?: string;
   productTitle: string;
   variantId: string;
   sku: string;
@@ -105,6 +106,7 @@ export interface InventoryEntry {
 
 export interface SupplierProfile {
   id: string;
+  merchantId?: string;
   name: string;
   parseHints: string;
   defaultLocation: PurchaseOrder["location"] | "";
@@ -116,6 +118,7 @@ export interface SupplierProfile {
 }
 
 export interface VelocityEntry {
+  merchantId?: string;
   sku: string;
   variantId?: string;
   productTitle: string;
@@ -125,6 +128,7 @@ export interface VelocityEntry {
 }
 
 export interface ShopifyProduct {
+  merchantId?: string;
   variantId: string;
   productId: string;
   productTitle: string;
@@ -146,6 +150,7 @@ export interface ShopifyProduct {
 
 export interface AuditLog {
   id: string;
+  merchantId?: string;
   poId: string;
   supplier: string;
   invoiceNumber: string;
@@ -166,6 +171,7 @@ export interface AuditLog {
 
 export interface PurchaseOrder {
   id: string;
+  merchantId?: string;
   supplier: string;
   invoiceNumber: string;
   invoiceDate: string;

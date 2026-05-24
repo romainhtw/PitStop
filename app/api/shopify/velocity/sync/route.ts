@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import type { VelocityEntry } from "@/lib/types";
 
@@ -64,8 +64,9 @@ async function fetchOrdersPage(sinceIso: string, pageInfo?: string): Promise<{
   return { orders: data.orders ?? [], nextPageInfo };
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const windowDays = 60;
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     const sinceIso = since.toISOString();
@@ -116,6 +117,7 @@ export async function POST() {
         // Firestore doc IDs cannot contain '/' — replace with '__'
         const docId = sku.replace(/\//g, "__");
         const entry: VelocityEntry = {
+          merchantId,
           sku,
           variantId: data.variantId,
           productTitle: data.productTitle,
@@ -130,6 +132,7 @@ export async function POST() {
 
     // Store sync metadata
     await adminDb.collection("velocityMeta").doc("latest").set({
+      merchantId,
       syncedAt: now,
       skuCount: unitsBySku.size,
       pagesFetched,

@@ -9,15 +9,20 @@ function supplierKey(name: string) {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { name: string } }
 ) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const snap = await adminDb.collection("suppliers").doc(supplierKey(params.name)).get();
     if (!snap.exists) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(snap.data() as SupplierProfile);
+    const data = snap.data() as SupplierProfile;
+    if (data.merchantId && data.merchantId !== merchantId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -29,6 +34,7 @@ export async function PUT(
   { params }: { params: { name: string } }
 ) {
   try {
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
     const body = await req.json() as Partial<SupplierProfile>;
     const key = supplierKey(params.name);
     const ref = adminDb.collection("suppliers").doc(key);
@@ -36,8 +42,12 @@ export async function PUT(
 
     const now = new Date().toISOString();
     const existingData = existing.exists ? (existing.data() as SupplierProfile) : null;
+    if (existingData?.merchantId && existingData.merchantId !== merchantId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const merged: SupplierProfile = {
       id: key,
+      merchantId,
       name: body.name || existingData?.name || key,
       parseHints: body.parseHints ?? existingData?.parseHints ?? "",
       defaultLocation: body.defaultLocation ?? existingData?.defaultLocation ?? "",

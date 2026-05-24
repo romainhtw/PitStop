@@ -11,10 +11,10 @@ const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-async function getSupplierHints(): Promise<string> {
+async function getSupplierHints(merchantId: string): Promise<string> {
   try {
     const snap = await Promise.race([
-      adminDb.collection("suppliers").get(),
+      adminDb.collection("suppliers").where("merchantId", "==", merchantId).get(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
     ]);
     if (!snap) return "";
@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
   try {
     console.log("[parse-invoice] Request received");
 
+    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+
     const formData = await req.formData();
     const file = formData.get("file");
 
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
     const base64Data = pdfBuffer.toString("base64");
 
     console.log("[parse-invoice] Fetching supplier hints");
-    const supplierHints = await getSupplierHints();
+    const supplierHints = await getSupplierHints(merchantId);
 
     console.log("[parse-invoice] Calling Claude API");
     const client = new Anthropic();
@@ -188,6 +190,7 @@ export async function POST(req: NextRequest) {
 
     const po: PurchaseOrder = {
       id: poId,
+      merchantId,
       supplier: (parsed.supplier as string) || "",
       invoiceNumber: (parsed.invoiceNumber as string) || "",
       invoiceDate: (parsed.invoiceDate as string) || "",
@@ -249,7 +252,7 @@ export async function POST(req: NextRequest) {
       const key = supplierName.toLowerCase().trim();
       waitUntil(
         adminDb.collection("suppliers").doc(key).set(
-          { name: supplierName, lastSeen: now },
+          { merchantId, name: supplierName, lastSeen: now },
           { merge: true }
         ).catch(() => {})
       );
