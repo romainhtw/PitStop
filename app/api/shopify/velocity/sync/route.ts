@@ -1,96 +1,109 @@
 import { NextResponse } from "next/server";
-import { shopifyFetch } from "@/lib/shopify";
 import { adminDb } from "@/lib/firebaseAdmin";
 import type { VelocityEntry } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const ORDERS_QUERY = /* GraphQL */ `
-  query GetOrders($cursor: String, $query: String!) {
-    orders(first: 250, after: $cursor, query: $query, sortKey: CREATED_AT) {
-      pageInfo { hasNextPage endCursor }
-      edges {
-        node {
-          lineItems(first: 100) {
-            edges {
-              node {
-                variant { id sku }
-                quantity
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
+const API_VERSION = "2025-04";
 
-interface OrdersData {
-  orders: {
-    pageInfo: { hasNextPage: boolean; endCursor: string | null };
-    edges: Array<{
-      node: {
-        lineItems: {
-          edges: Array<{
-            node: {
-              variant: { id: string; sku: string } | null;
-              quantity: number;
-            };
-          }>;
-        };
-      };
-    }>;
-  };
+interface RestLineItem {
+  variant_id: number | null;
+  sku: string | null;
+  quantity: number;
+  name: string;
+}
+
+interface RestOrder {
+  id: number;
+  line_items: RestLineItem[];
+}
+
+async function fetchOrdersPage(sinceIso: string, pageInfo?: string): Promise<{
+  orders: RestOrder[];
+  nextPageInfo: string | null;
+}> {
+  const domain = process.env.SHOPIFY_STORE_DOMAIN!;
+  const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!;
+
+  let url: string;
+  if (pageInfo) {
+    // Cursor-based pagination
+    url = `https://${domain}/admin/api/${API_VERSION}/orders.json?limit=250&page_info=${pageInfo}&fields=id,line_items`;
+  } else {
+    // First page — filter by date and financial status
+    const params = new URLSearchParams({
+      status: "any",
+      financial_status: "paid",
+      created_at_min: sinceIso,
+      limit: "250",
+      fields: "id,line_items",
+    });
+    url = `https://${domain}/admin/api/${API_VERSION}/orders.json?${params}`;
+  }
+
+  const res = await fetch(url, {
+    headers: {
+      "X-Shopify-Access-Token": token,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Shopify REST error ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  // Extract next page cursor from Link header
+  const linkHeader = res.headers.get("link") ?? "";
+  let nextPageInfo: string | null = null;
+  const nextMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+  if (nextMatch) nextPageInfo = nextMatch[1];
+
+  const data = await res.json() as { orders: RestOrder[] };
+  return { orders: data.orders ?? [], nextPageInfo };
 }
 
 export async function POST() {
   try {
     const windowDays = 90;
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-    const sinceIso = since.toISOString().slice(0, 10);
-    const queryStr = `created_at:>=${sinceIso} financial_status:paid`;
+    const sinceIso = since.toISOString();
 
     const unitsBySku = new Map<string, { variantId: string; productTitle: string; units: number }>();
 
-    let cursor: string | null = null;
+    let pageInfo: string | undefined;
     let pagesFetched = 0;
     const MAX_PAGES = 8;
 
     do {
-      const result: Awaited<ReturnType<typeof shopifyFetch<OrdersData>>> = await shopifyFetch<OrdersData>(ORDERS_QUERY, {
-        cursor: cursor ?? undefined,
-        query: queryStr,
-      });
+      const { orders, nextPageInfo } = await fetchOrdersPage(sinceIso, pageInfo);
 
-      if (result.errors?.length) {
-        throw new Error(result.errors[0].message);
-      }
-
-      const orders: OrdersData["orders"] | undefined = result.data?.orders;
-      if (!orders) break;
-
-      for (const { node: order } of orders.edges) {
-        for (const { node: item } of order.lineItems.edges) {
-          if (!item.variant?.sku) continue;
-          const sku = item.variant.sku.trim();
+      for (const order of orders) {
+        for (const item of order.line_items) {
+          const sku = item.sku?.trim();
           if (!sku) continue;
+          const variantId = item.variant_id ? String(item.variant_id) : sku;
           const existing = unitsBySku.get(sku);
           if (existing) {
             existing.units += item.quantity;
           } else {
             unitsBySku.set(sku, {
-              variantId: item.variant.id,
-              productTitle: sku,
+              variantId,
+              productTitle: item.name ?? sku,
               units: item.quantity,
             });
           }
         }
       }
 
-      cursor = orders.pageInfo.hasNextPage ? orders.pageInfo.endCursor : null;
+      pageInfo = nextPageInfo ?? undefined;
       pagesFetched++;
-    } while (cursor && pagesFetched < MAX_PAGES);
+
+      // Stop if no more pages or fewer than 250 orders (last page)
+      if (orders.length < 250) break;
+
+    } while (pageInfo && pagesFetched < MAX_PAGES);
 
     // Write velocity docs to Firestore in batches of 499
     const now = new Date().toISOString();
