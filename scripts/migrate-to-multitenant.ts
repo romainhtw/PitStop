@@ -23,9 +23,13 @@ import * as bcrypt from "bcrypt";
 // ── Init ────────────────────────────────────────────────────────────────────
 
 if (!getApps().length) {
-  initializeApp({
-    credential: cert(process.env.GOOGLE_APPLICATION_CREDENTIALS as string),
-  });
+  const saJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (saJson) {
+    initializeApp({ credential: cert(JSON.parse(saJson) as Parameters<typeof cert>[0]) });
+  } else {
+    // Application Default Credentials (Firebase CLI / gcloud auth)
+    initializeApp({ projectId: "pitstop-ea39d" });
+  }
 }
 const db = getFirestore();
 
@@ -42,7 +46,6 @@ const COLLECTIONS = [
   "shopifyProducts",
   "transfers",
   "auditLogs",
-  "velocityCache",
 ] as const;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -141,7 +144,7 @@ async function createMerchantDoc(): Promise<void> {
     limits: {
       locations: 3,
       skus: 5000,
-      features: ["ai_parsing", "velocity_sync"],
+      features: ["ai_parsing"],
     },
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),

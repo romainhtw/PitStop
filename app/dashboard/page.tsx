@@ -315,11 +315,6 @@ export default function DashboardPage() {
                         View →
                       </Link>
                       <div className="flex items-center gap-3">
-                        {po.status === "ordered" && (
-                          <Link href={`/purchase-orders/${po.id}/reconcile`} className="text-xs font-medium text-status-pending hover:underline">
-                            Receive
-                          </Link>
-                        )}
                         <button onClick={() => handleReuse(po)} disabled={reusing === po.id} className="text-xs text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50">
                           {reusing === po.id ? "…" : "Reuse"}
                         </button>
@@ -365,11 +360,6 @@ export default function DashboardPage() {
                         <td className="px-4 py-2.5"><StatusBadge status={STATUS_MAP[po.status]} /></td>
                         <td className="px-4 py-2.5 text-right">
                           <div className="flex items-center justify-end gap-4">
-                            {po.status === "ordered" && (
-                              <Link href={`/purchase-orders/${po.id}/reconcile`} className="text-xs text-status-pending hover:underline transition-colors">
-                                Receive
-                              </Link>
-                            )}
                             <button onClick={() => handleReuse(po)} disabled={reusing === po.id} className="text-xs text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50">
                               {reusing === po.id ? "Creating…" : "Reuse"}
                             </button>

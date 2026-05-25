@@ -18,7 +18,6 @@ const NAV_GROUPS = [
     items: [
       { href: "/purchase-orders/new", label: "Purchase Orders" },
       { href: "/stock-take",          label: "Stock Take"      },
-      { href: "/reorder",             label: "Reorder"         },
     ],
   },
   {

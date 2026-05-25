@@ -105,13 +105,6 @@ export async function POST(req: NextRequest) {
           rawEnd,
         );
 
-        // ── REFERRAL DETECTION ──────────────────────────────────────────
-        const discountEntry = session.total_details?.breakdown?.discounts?.[0];
-        const promoCodeRef = (discountEntry?.discount as unknown as Record<string, unknown>)?.promotion_code;
-        if (promoCodeRef) {
-          const promoId = typeof promoCodeRef === "string" ? promoCodeRef : (promoCodeRef as { id: string }).id;
-          await handleReferral(stripe, promoId, session.customer as string, session.customer_details?.email ?? "");
-        }
         break;
       }
 
@@ -182,65 +175,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ received: true });
-}
-
-// ── REFERRAL PROCESSING ─────────────────────────────────────────────────────
-
-async function handleReferral(
-  stripe: Stripe,
-  promotionCodeId: string,
-  refereeCustomerId: string,
-  refereeEmail: string
-): Promise<void> {
-  try {
-    const promo = await stripe.promotionCodes.retrieve(promotionCodeId);
-    const referrerCustomerId = promo.metadata?.referrerCustomerId;
-    const referralCode = promo.code;
-
-    if (!referrerCustomerId) return; // not a referral promo code
-
-    const now = new Date().toISOString();
-    const CREDIT_CENTS = 5000; // $50 AUD
-    const FREE_INVOICES = 20;
-
-    // 1. Apply $50 balance credit to referrer
-    await stripe.customers.createBalanceTransaction(referrerCustomerId, {
-      amount: -CREDIT_CENTS, // negative = credit
-      currency: "aud",
-      description: `Referral reward — ${refereeEmail} joined via ${referralCode}`,
-      metadata: { type: "referral_reward", referralCode, refereeCustomerId },
-    });
-
-    // 2. Unlock 20 free invoices for referee in Firestore
-    await adminDb.collection("settings").doc("billing").update({
-      freeInvoiceCredits: FREE_INVOICES,
-      freeInvoicesUsed: 0,
-      referredBy: referralCode,
-      referredAt: now,
-    });
-
-    // 3. Update referral record
-    const referralRef = adminDb.collection("referrals").doc(referralCode);
-    const referralSnap = await referralRef.get();
-    if (referralSnap.exists) {
-      const data = referralSnap.data() as {
-        totalReferrals?: number;
-        totalCreditsEarned?: number;
-        referrals?: unknown[];
-      };
-      await referralRef.update({
-        totalReferrals: (data.totalReferrals ?? 0) + 1,
-        totalCreditsEarned: (data.totalCreditsEarned ?? 0) + CREDIT_CENTS,
-        referrals: [
-          ...(data.referrals ?? []),
-          { refereeCustomerId, refereeEmail, signedUpAt: now, creditAmountCents: CREDIT_CENTS },
-        ],
-      });
-    }
-
-    console.log(`[referral] $50 credit → ${referrerCustomerId} | 20 free invoices → ${refereeCustomerId}`);
-  } catch (err) {
-    console.error("[referral] handleReferral failed:", err);
-    // Non-fatal — don't fail the webhook
-  }
 }

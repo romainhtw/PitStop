@@ -478,7 +478,6 @@ function BillingContent() {
               "Barcode stock take (offline-first)",
               "Supplier learning — gets smarter over time",
               "Multi-location transfers",
-              "Sales velocity & reorder alerts",
               "Price audit & catalogue management",
               "Duplicate invoice detection",
               "Audit log for every sync",

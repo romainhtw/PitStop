@@ -23,13 +23,13 @@ export const TIERS: Record<TierName, TierLimits> = {
     locations: 3,
     skus:      5000,
     invoices:  100,
-    features:  ["ai_parsing", "velocity_sync"],
+    features:  ["ai_parsing"],
   },
   PRO: {
     locations: -1,
     skus:      -1,
     invoices:  -1,
-    features:  ["ai_parsing", "velocity_sync", "priority_support"],
+    features:  ["ai_parsing", "priority_support"],
   },
 };
 

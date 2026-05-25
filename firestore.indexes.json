@@ -106,22 +106,6 @@
         { "fieldPath": "merchantId", "order": "ASCENDING" },
         { "fieldPath": "timestamp",  "order": "DESCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "velocityCache",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "merchantId", "order": "ASCENDING" },
-        { "fieldPath": "sku",        "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "velocityCache",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "merchantId", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt",  "order": "DESCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []

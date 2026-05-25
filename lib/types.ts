@@ -1,21 +1,5 @@
 export type POStatus = "draft" | "awaiting_review" | "ordered" | "approved";
 
-export type ReconcileStatus = "EXACT" | "COST_DRIFT" | "QTY_SHORTAGE" | "SURPLUS" | "SKU_MISMATCH";
-
-export interface ReconcileLineResult {
-  poLineId: string | null;
-  invoiceLineIdx: number;
-  name: string;
-  sku: string;
-  status: ReconcileStatus;
-  expectedQty: number;
-  actualQty: number;
-  expectedCost: number;
-  actualCost: number;
-  qtyDelta: number;
-  costDriftPct: number;
-}
-
 export interface LineItemOptionValue {
   optionName: string;
   optionValue: string;
@@ -115,16 +99,6 @@ export interface SupplierProfile {
   updatedAt: string;
   leadTimeDays?: number;
   safetyStockDays?: number;
-}
-
-export interface VelocityEntry {
-  merchantId?: string;
-  sku: string;
-  variantId?: string;
-  productTitle: string;
-  unitsSold90d: number;
-  velocityPerDay: number;
-  lastSyncedAt: string;
 }
 
 export interface ShopifyProduct {
