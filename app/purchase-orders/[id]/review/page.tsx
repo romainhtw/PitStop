@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BackButton from "@/components/BackButton";
+import ShopifyConfigModal from "@/components/ShopifyConfigModal";
 import { v4 as uuidv4 } from "uuid";
 import type { InvoiceTotals, LineItem, PurchaseOrder, SyncResult, VariantSuggestion } from "@/lib/types";
 import { loadCatalog } from "@/lib/catalogCache";
@@ -133,6 +134,12 @@ export default function ReviewPurchaseOrderPage() {
 
   const [catalogCategories, setCatalogCategories] = useState<string[]>([]);
 
+  // Shopify config gate — set after /api/auth/me resolves
+  const [merchantId, setMerchantId] = useState<string | null>(null);
+  const [showShopifyConfig, setShowShopifyConfig] = useState(false);
+  // After modal saves, resume the action that triggered it ("preview" | "sync")
+  const [pendingSyncAction, setPendingSyncAction] = useState<null | "preview" | "sync">(null);
+
   const [manualSearchQueries, setManualSearchQueries] = useState<Record<string, string>>({});
   const [manualSearchResults, setManualSearchResults] = useState<Record<string, VariantSuggestion[]>>({});
   const [manualSearching, setManualSearching] = useState<Record<string, boolean>>({});
@@ -142,9 +149,21 @@ export default function ReviewPurchaseOrderPage() {
   const [creating, setCreating] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    // Discover caller's merchantId via middleware-verified session
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { merchantId?: string } | null) => {
+        if (data?.merchantId) setMerchantId(data.merchantId);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     loadCatalog().then((products) => {
-      const types = Array.from(new Set(products.map((p) => p.productType).filter(Boolean))).sort();
-      setCatalogCategories(types);
+      const cols = Array.from(
+        new Set(products.flatMap((p) => p.collections ?? []).filter(Boolean))
+      ).sort();
+      setCatalogCategories(cols);
     }).catch(() => {});
   }, []);
 
@@ -392,7 +411,25 @@ export default function ReviewPurchaseOrderPage() {
     }
   };
 
+  // Returns true if Shopify is configured for this merchant; otherwise opens the
+  // config modal and returns false. The pending action is replayed onSuccess.
+  async function ensureShopifyConfigured(action: "preview" | "sync"): Promise<boolean> {
+    if (!merchantId) return true; // legacy single-tenant session — let the API handle it
+    try {
+      const res = await fetch(`/api/merchants/${merchantId}/config-status`);
+      if (!res.ok) return true; // fail-open: don't block on a transient error
+      const data = await res.json() as { configured?: boolean };
+      if (data.configured) return true;
+    } catch {
+      return true;
+    }
+    setPendingSyncAction(action);
+    setShowShopifyConfig(true);
+    return false;
+  }
+
   const handlePreview = async () => {
+    if (!(await ensureShopifyConfigured("preview"))) return;
     setPreviewing(true);
     setError(null);
     try {
@@ -429,6 +466,7 @@ export default function ReviewPurchaseOrderPage() {
   };
 
   const handleConfirmSync = async () => {
+    if (!(await ensureShopifyConfigured("sync"))) return;
     setSyncing(true);
     setError(null);
     setDuplicateInvoiceError(null);
@@ -1008,7 +1046,7 @@ export default function ReviewPurchaseOrderPage() {
                                     value={manualSearchQueries[r.lineItemId] ?? ""}
                                     onChange={(e) => setManualSearchQueries((prev) => ({ ...prev, [r.lineItemId]: e.target.value }))}
                                     onKeyDown={(e) => e.key === "Enter" && handleManualSearch(r.lineItemId)}
-                                    className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
+                                    className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
                                   />
                                   <button
                                     onClick={() => handleManualSearch(r.lineItemId)}
@@ -1167,7 +1205,7 @@ export default function ReviewPurchaseOrderPage() {
                                 value={manualSearchQueries[r.lineItemId] ?? ""}
                                 onChange={(e) => setManualSearchQueries((prev) => ({ ...prev, [r.lineItemId]: e.target.value }))}
                                 onKeyDown={(e) => e.key === "Enter" && handleManualSearch(r.lineItemId)}
-                                className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
+                                className="flex-1 rounded border border-amber-200 px-3 py-1.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
                               />
                               <button
                                 onClick={() => handleManualSearch(r.lineItemId)}
@@ -1398,6 +1436,24 @@ export default function ReviewPurchaseOrderPage() {
         </div>
       )}
       </div>
+
+      {showShopifyConfig && merchantId && (
+        <ShopifyConfigModal
+          merchantId={merchantId}
+          onClose={() => {
+            setShowShopifyConfig(false);
+            setPendingSyncAction(null);
+          }}
+          onSuccess={() => {
+            setShowShopifyConfig(false);
+            const action = pendingSyncAction;
+            setPendingSyncAction(null);
+            // Resume what the user originally clicked.
+            if (action === "preview") void handlePreview();
+            else if (action === "sync") void handleConfirmSync();
+          }}
+        />
+      )}
     </div>
   );
 }
