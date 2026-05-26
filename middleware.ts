@@ -4,7 +4,7 @@ import { jwtVerify, type JWTPayload } from "jose";
 // ── Route classification ─────────────────────────────────────────────────────
 const WEBHOOK_RE    = /^\/api\/(billing\/webhook|shopify\/webhooks|stripe\/webhook)/;
 const STATIC_RE     = /^\/(_next|favicon\.ico|logo\.png|public)/;
-const AUTH_RE       = /^\/(login|register|onboarding|api\/auth|api\/onboarding)/;
+const AUTH_RE       = /^\/(login|register|onboarding|signup|pricing|api\/auth|api\/onboarding|api\/merchants\/signup)/;
 const OWNER_ONLY_RE = /^\/(billing|settings|api-keys|api\/merchants|api\/billing)/;
 
 // ── JWT payload shape ────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ export async function middleware(req: NextRequest) {
   if (WEBHOOK_RE.test(pathname)) return NextResponse.next();
   if (STATIC_RE.test(pathname))  return NextResponse.next();
   if (AUTH_RE.test(pathname))    return NextResponse.next();
+  if (pathname === "/")          return NextResponse.next();
 
   // Try JWT auth (multi-tenant)
   const ownerPayload = await verifyToken(req.cookies.get("pitstop_owner_auth")?.value);

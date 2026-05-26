@@ -4,8 +4,14 @@ import type { SupplierProfile } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-function supplierKey(name: string) {
+function supplierNameKey(name: string) {
   return decodeURIComponent(name).toLowerCase().trim();
+}
+
+// Tenant-scoped Firestore document id: prevents one tenant's supplier doc from
+// shadowing another's when they share a supplier name (e.g. "BSD").
+function supplierDocId(merchantId: string, name: string) {
+  return `${merchantId}__${supplierNameKey(name)}`;
 }
 
 export async function GET(
@@ -13,8 +19,19 @@ export async function GET(
   { params }: { params: { name: string } }
 ) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
-    const snap = await adminDb.collection("suppliers").doc(supplierKey(params.name)).get();
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    const docId = supplierDocId(merchantId, params.name);
+    let snap = await adminDb.collection("suppliers").doc(docId).get();
+
+    // Back-compat: fall back to the pre-namespaced doc id, but only if it
+    // belongs to this tenant.
+    if (!snap.exists) {
+      const legacy = await adminDb.collection("suppliers").doc(supplierNameKey(params.name)).get();
+      if (legacy.exists && (legacy.data() as SupplierProfile).merchantId === merchantId) {
+        snap = legacy;
+      }
+    }
     if (!snap.exists) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -34,10 +51,12 @@ export async function PUT(
   { params }: { params: { name: string } }
 ) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const body = await req.json() as Partial<SupplierProfile>;
-    const key = supplierKey(params.name);
-    const ref = adminDb.collection("suppliers").doc(key);
+    const nameKey = supplierNameKey(params.name);
+    const docId   = supplierDocId(merchantId, params.name);
+    const ref     = adminDb.collection("suppliers").doc(docId);
     const existing = await ref.get();
 
     const now = new Date().toISOString();
@@ -46,9 +65,9 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const merged: SupplierProfile = {
-      id: key,
+      id: docId,
       merchantId,
-      name: body.name || existingData?.name || key,
+      name: body.name || existingData?.name || nameKey,
       parseHints: body.parseHints ?? existingData?.parseHints ?? "",
       defaultLocation: body.defaultLocation ?? existingData?.defaultLocation ?? "",
       approvedPOCount: existingData?.approvedPOCount ?? 0,

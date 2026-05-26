@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
   try {
     console.log("[parse-invoice] Request received");
 
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
     // ── Free tier gate ────────────────────────────────────────────────────────
     const merchantSnap = await adminDb.collection("merchants").doc(merchantId).get();

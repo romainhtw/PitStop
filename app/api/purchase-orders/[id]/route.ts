@@ -10,7 +10,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const snap = await adminDb.collection("purchaseOrders").doc(params.id).get();
     if (!snap.exists) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -31,7 +32,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const body = (await req.json()) as Partial<PurchaseOrder>;
     const ref = adminDb.collection("purchaseOrders").doc(params.id);
     const existing = await ref.get();
@@ -67,7 +69,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const ref = adminDb.collection("purchaseOrders").doc(params.id);
     const snap = await ref.get();
 

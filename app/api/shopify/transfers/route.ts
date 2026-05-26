@@ -36,7 +36,8 @@ function locationGid(loc: TransferLocation): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const snap = await adminDb
       .collection("transfers")
       .where("merchantId", "==", merchantId)
@@ -55,7 +56,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const body = await req.json() as {
       fromLocation: TransferLocation;
       toLocation: TransferLocation;

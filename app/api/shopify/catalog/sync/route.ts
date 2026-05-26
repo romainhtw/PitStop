@@ -8,7 +8,8 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     if (!process.env.SHOPIFY_STORE_DOMAIN || !process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
       return NextResponse.json({ error: "Shopify credentials not configured" }, { status: 500 });
     }

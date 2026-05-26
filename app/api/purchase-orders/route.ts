@@ -7,7 +7,8 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const url = new URL(req.url);
     const limitParam = Math.min(parseInt(url.searchParams.get("limit") ?? "100"), 200);
     const snap = await adminDb
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const body = (await req.json()) as Partial<PurchaseOrder>;
     const now = new Date().toISOString();
     const id = body.id || uuidv4();

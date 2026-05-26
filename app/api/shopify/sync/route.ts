@@ -152,7 +152,8 @@ function allocateLandedCosts(
 
 export async function POST(req: NextRequest) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     type SyncOverride = { variantId: string; inventoryItemId: string; productTitle: string };
     const { poId, dryRun, overrides } = (await req.json()) as {
       poId: string;

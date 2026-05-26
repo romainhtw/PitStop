@@ -5,7 +5,8 @@ import { getFreeTierUsage, PLAN_QUOTAS, PLAN_NAMES } from "@/lib/stripe/usageTra
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+  const merchantId = req.headers.get("x-merchant-id");
+  if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
   const merchantSnap = await adminDb.collection("merchants").doc(merchantId).get();
   const plan: string = merchantSnap.exists

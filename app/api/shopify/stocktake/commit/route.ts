@@ -11,7 +11,8 @@ interface CommitItem {
 
 export async function POST(req: NextRequest) {
   try {
-    const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+    const merchantId = req.headers.get("x-merchant-id");
+    if (!merchantId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     const { items, locationId }: { items: CommitItem[]; locationId: string } = await req.json();
 
     if (!items?.length) return NextResponse.json({ error: "No items provided" }, { status: 400 });
