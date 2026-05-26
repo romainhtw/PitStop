@@ -75,6 +75,9 @@ export const FIND_VARIANT_QUERY = /* GraphQL */ `
           product {
             title
             productType
+            collections(first: 5) {
+              edges { node { title } }
+            }
           }
           inventoryItem {
             id
@@ -97,6 +100,9 @@ const FIND_VARIANT_WITH_INVENTORY_QUERY = /* GraphQL */ `
           product {
             title
             productType
+            collections(first: 5) {
+              edges { node { title } }
+            }
           }
           inventoryItem {
             id
@@ -196,7 +202,11 @@ interface ShopifyVariantNode {
   sku: string;
   barcode: string;
   price?: string;
-  product: { title: string; productType?: string };
+  product: {
+    title: string;
+    productType?: string;
+    collections?: { edges: Array<{ node: { title: string } }> };
+  };
   inventoryItem: {
     id: string;
     inventoryLevel?: { quantities: Array<{ quantity: number }> } | null;
@@ -272,14 +282,17 @@ function extractCoreModel(name: string): string {
     .split(/\s+/)
     .filter(Boolean);
 
-  // Drop single-character tokens (sizes like S, M, L), color words, and pure numbers
-  const core = tokens.filter(
-    (t) => t.length > 1 && !SIZE_WORDS.has(t) && !COLOR_WORDS.has(t) && !/^\d+$/.test(t)
-  );
+  const hasAlpha = tokens.some((t) => /[a-z]/.test(t));
 
-  // Use first 2 meaningful tokens — conservative to avoid niche supplier terms
-  // that don't appear in Shopify product titles (e.g. "ACE LED" from PSI Cycling)
-  return core.slice(0, 2).join(" ");
+  const core = tokens.filter((t) => {
+    if (t.length <= 1) return false;
+    if (SIZE_WORDS.has(t) || COLOR_WORDS.has(t)) return false;
+    // Keep model numbers (2+ digit pure numbers) when there's a brand name present
+    if (/^\d{2,}$/.test(t)) return hasAlpha;
+    return true;
+  });
+
+  return core.slice(0, 4).join(" ");
 }
 
 export async function fetchVariantsByQuery(q: string): Promise<ShopifyVariantNode[]> {
@@ -337,6 +350,13 @@ export const CATALOG_QUERY = /* GraphQL */ `
           status
           tags
           updatedAt
+          collections(first: 10) {
+            edges {
+              node {
+                title
+              }
+            }
+          }
           variants(first: 100) {
             edges {
               node {
@@ -367,6 +387,7 @@ interface CatalogData {
         status: string;
         tags: string[];
         updatedAt: string;
+        collections: { edges: Array<{ node: { title: string } }> };
         variants: {
           edges: Array<{
             node: {
@@ -396,6 +417,7 @@ export interface CatalogVariant {
   compareAtPrice: number | null;
   inventoryItemId: string;
   productType: string;
+  collections: string[];
   status: string;
   tags: string[];
   shopifyUpdatedAt: string;
@@ -424,6 +446,7 @@ export async function fetchAllActiveVariants(): Promise<CatalogVariant[]> {
           compareAtPrice: v.compareAtPrice ? parseFloat(v.compareAtPrice) : null,
           inventoryItemId: v.inventoryItem.id,
           productType: p.productType || "",
+          collections: p.collections.edges.map((e) => e.node.title),
           status: p.status,
           tags: p.tags,
           shopifyUpdatedAt: p.updatedAt,

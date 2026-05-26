@@ -10,7 +10,7 @@ import {
   checkLocation,
   toLocationGid,
 } from "@/lib/shopify";
-import { lookupMapping, saveMapping } from "@/lib/adminMappings";
+import { lookupMapping, saveMapping, lookupNameMapping, saveNameMapping } from "@/lib/adminMappings";
 import type { AuditLog, PurchaseOrder, LineSyncResult, SyncResult, VariantSuggestion } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -25,24 +25,61 @@ function modelOptionTokens(optionValues?: Array<{ optionName: string; optionValu
     .join(" ");
 }
 
+function extractModelTokens(name: string): string[] {
+  const tokens = name.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  return tokens.filter(
+    (t) => /^\d{2,}$/.test(t) || /^[a-z]{1,5}\d{2,}/.test(t) || /^\d{2,}[a-z]{1,5}$/.test(t)
+  );
+}
+
+function extractBrandToken(name: string): string {
+  const tokens = name.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const STOPWORDS = new Set(["the", "and", "for", "set", "kit", "new", "pro", "with", "black", "white", "red", "blue"]);
+  return tokens.find((t) => /^[a-z]{2,}$/.test(t) && !STOPWORDS.has(t)) ?? "";
+}
+
 async function enrichedTitleSearch(
   name: string,
   optionValues?: Array<{ optionName: string; optionValue: string }>
 ): Promise<VariantSuggestion[]> {
-  const modelTokens = modelOptionTokens(optionValues);
-  const searches = [searchVariantsByTitle(name)] as ReturnType<typeof searchVariantsByTitle>[];
-  if (modelTokens) {
-    const nameToken = name.split(/\s+/).find((w) => w.length >= 4) ?? "";
-    if (nameToken) {
-      searches.push(fetchVariantsByQuery(`title:${nameToken} ${modelTokens}`));
-      searches.push(fetchVariantsByQuery(`title:${modelTokens}`));
-    }
+  const modelTokens = extractModelTokens(name);
+  const brand = extractBrandToken(name);
+  const optionModel = modelOptionTokens(optionValues);
+
+  const searchTerms: string[] = [];
+
+  // 1. Full name (most specific)
+  searchTerms.push(name);
+
+  // 2. Brand + each model number token
+  for (const m of modelTokens) {
+    if (brand) searchTerms.push(`${brand} ${m}`);
+    // 3. Model number alone (very discriminating in cycling)
+    searchTerms.push(m);
   }
-  const results = await Promise.all(searches);
+
+  // 4. From optionValues (size/model combos)
+  if (optionModel) {
+    if (brand) searchTerms.push(`${brand} ${optionModel}`);
+    searchTerms.push(optionModel);
+  }
+
+  // Deduplicate and cap at 6 searches
+  const uniqueTerms = Array.from(new Set(searchTerms)).slice(0, 6);
+
+  const results = await Promise.allSettled(
+    uniqueTerms.map((term) => {
+      if (term === name) return searchVariantsByTitle(term);
+      return fetchVariantsByQuery(`title:${term}`);
+    })
+  );
+
   const seen = new Set<string>();
   const merged: VariantSuggestion[] = [];
-  for (const batch of results) {
-    for (const v of batch) {
+
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    for (const v of result.value) {
       if (seen.has(v.id)) continue;
       seen.add(v.id);
       merged.push({
@@ -55,18 +92,45 @@ async function enrichedTitleSearch(
       });
     }
   }
-  return merged.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 10);
+
+  // Sort by score desc, only show results with score > 0, cap at 10
+  return merged
+    .filter((s) => (s.score ?? 0) > 0)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 10);
 }
 
-function titleScore(productTitle: string, query: string): number {
-  const t = productTitle.toLowerCase();
-  const q = query.toLowerCase().trim();
+function titleScore(productTitle: string, lineItemName: string): number {
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const t = normalize(productTitle);
+  const q = normalize(lineItemName);
+
   if (t === q) return 100;
-  if (t.startsWith(q)) return 90;
-  const words = q.split(/\s+/).filter((w) => w.length > 1);
-  if (words.every((w) => t.includes(w))) return 80;
-  const matchCount = words.filter((w) => t.includes(w)).length;
-  return Math.round((matchCount / Math.max(words.length, 1)) * 60);
+  if (t.includes(q)) return 95;
+
+  const tSet = new Set(t.split(" ").filter(Boolean));
+  const qTokens = q.split(" ").filter((w) => w.length >= 2);
+
+  if (qTokens.length === 0) return 0;
+
+  let score = 0;
+  let totalWeight = 0;
+
+  for (const tok of qTokens) {
+    // Model numbers (pure 2+ digit numbers, or alphanumeric combos like r7000) get 3x weight
+    const isModel =
+      /^\d{2,}$/.test(tok) ||
+      /^[a-z]{1,4}\d{2,}/.test(tok) ||
+      /^\d{2,}[a-z]{1,4}/.test(tok);
+    const weight = isModel ? 3 : 1;
+    totalWeight += weight;
+    if (tSet.has(tok) || t.includes(tok)) {
+      score += weight;
+    }
+  }
+
+  return Math.round((score / totalWeight) * 90);
 }
 
 // Value-based landed cost allocation: distribute freight/insurance/customs/brokerage
@@ -187,6 +251,7 @@ export async function POST(req: NextRequest) {
           if (!dryRun) {
             if (item.sku) await saveMapping(merchantId, po.supplier, item.sku, override);
             if (item.barcode) await saveMapping(merchantId, po.supplier, item.barcode, override);
+            if (item.name) await saveNameMapping(merchantId, po.supplier, item.name, override);
           }
         } else if (!item.sku) {
           result.errorMessage = "No SKU/barcode on this line item";
@@ -206,28 +271,42 @@ export async function POST(req: NextRequest) {
             result.shopifyProductTitle = knownMatch.productTitle;
             result.matchedFromCache = true;
           } else {
-            let variant = await findVariantBySku(item.sku, dryRun ? locationGid : undefined);
-            if (!variant && item.barcode) {
-              variant = await findVariantBySku(item.barcode, dryRun ? locationGid : undefined);
-            }
-            if (variant) {
-              result.shopifyVariantId = variant.id;
-              result.inventoryItemId = variant.inventoryItem.id;
-              result.shopifyProductTitle = variant.product?.title;
-              if (variant.price) result.shopifyPrice = parseFloat(variant.price);
-              if (variant.product?.productType) result.shopifyCategory = variant.product.productType;
-              const missing: { field: string; suggestedValue: string }[] = [];
-              if (!variant.sku && item.sku) missing.push({ field: "sku", suggestedValue: item.sku });
-              if (!variant.barcode && item.barcode) missing.push({ field: "barcode", suggestedValue: item.barcode });
-              else if (!variant.barcode && item.sku) missing.push({ field: "barcode", suggestedValue: item.sku });
-              if (missing.length > 0) result.shopifyMissingFields = missing;
-              if (!dryRun) {
-                const matchData = { variantId: variant.id, inventoryItemId: variant.inventoryItem.id, productTitle: variant.product?.title ?? "" };
-                if (item.sku) await saveMapping(merchantId, po.supplier, item.sku, matchData);
-                if (item.barcode) await saveMapping(merchantId, po.supplier, item.barcode, matchData);
+            // Check name-based learned mapping before hitting Shopify
+            const nameMatch = item.name
+              ? await lookupNameMapping(merchantId, po.supplier, item.name)
+              : null;
+
+            if (nameMatch) {
+              result.shopifyVariantId = nameMatch.variantId;
+              result.inventoryItemId = nameMatch.inventoryItemId;
+              result.shopifyProductTitle = nameMatch.productTitle;
+              result.matchedFromCache = true;
+            } else {
+              let variant = await findVariantBySku(item.sku, dryRun ? locationGid : undefined);
+              if (!variant && item.barcode) {
+                variant = await findVariantBySku(item.barcode, dryRun ? locationGid : undefined);
               }
-            } else if (dryRun) {
-              result.suggestions = await enrichedTitleSearch(item.name, item.optionValues);
+              if (variant) {
+                result.shopifyVariantId = variant.id;
+                result.inventoryItemId = variant.inventoryItem.id;
+                result.shopifyProductTitle = variant.product?.title;
+                if (variant.price) result.shopifyPrice = parseFloat(variant.price);
+                const firstCollection = variant.product?.collections?.edges?.[0]?.node?.title;
+                result.shopifyCategory = firstCollection || variant.product?.productType || "";
+                const missing: { field: string; suggestedValue: string }[] = [];
+                if (!variant.sku && item.sku) missing.push({ field: "sku", suggestedValue: item.sku });
+                if (!variant.barcode && item.barcode) missing.push({ field: "barcode", suggestedValue: item.barcode });
+                else if (!variant.barcode && item.sku) missing.push({ field: "barcode", suggestedValue: item.sku });
+                if (missing.length > 0) result.shopifyMissingFields = missing;
+                if (!dryRun) {
+                  const matchData = { variantId: variant.id, inventoryItemId: variant.inventoryItem.id, productTitle: variant.product?.title ?? "" };
+                  if (item.sku) await saveMapping(merchantId, po.supplier, item.sku, matchData);
+                  if (item.barcode) await saveMapping(merchantId, po.supplier, item.barcode, matchData);
+                  if (item.name) await saveNameMapping(merchantId, po.supplier, item.name, matchData).catch(() => {});
+                }
+              } else if (dryRun) {
+                result.suggestions = await enrichedTitleSearch(item.name, item.optionValues);
+              }
             }
           }
         }
