@@ -79,7 +79,21 @@ export default function NewPurchaseOrderPage() {
   const [filename, setFilename] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<{
+    invoicesUsed: number;
+    invoiceLimit: number;
+    remaining: number;
+    isBlocked: boolean;
+    plan: string;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/merchants/usage")
+      .then((r) => r.json())
+      .then(setUsage)
+      .catch(() => {});
+  }, []);
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -126,19 +140,46 @@ export default function NewPurchaseOrderPage() {
         Drop a supplier invoice PDF below — we&apos;ll extract the line items for you to review.
       </p>
 
+      {usage?.plan === "free" && (
+        <div className={`mb-6 flex items-center justify-between gap-4 rounded-lg px-4 py-3 border text-sm ${
+          usage.isBlocked
+            ? "bg-red-50 border-red-200 text-red-700"
+            : usage.remaining <= 1
+            ? "bg-amber-50 border-amber-200 text-amber-700"
+            : "bg-surface-2 border-border-1 text-text-secondary"
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">
+              {usage.invoicesUsed} / {usage.invoiceLimit}
+            </span>
+            <span>free invoices used this month</span>
+            {usage.isBlocked && <span className="font-semibold">— limit reached</span>}
+          </div>
+          <a
+            href="/billing"
+            className="shrink-0 inline-flex items-center gap-1 font-semibold text-accent hover:underline"
+          >
+            Upgrade &rarr;
+          </a>
+        </div>
+      )}
+
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
+          if (usage?.isBlocked) return;
           const file = e.dataTransfer.files?.[0];
           if (file) handleFile(file);
         }}
-        onClick={() => !loading && inputRef.current?.click()}
+        onClick={() => !loading && !usage?.isBlocked && inputRef.current?.click()}
         className={`border-2 border-dashed py-16 px-12 text-center transition-colors ${
           loading
             ? "border-border-1 bg-surface-1 cursor-default"
+            : usage?.isBlocked
+            ? "border-red-200 bg-red-50 cursor-not-allowed"
             : dragging
             ? "border-accent bg-surface-2 cursor-copy"
             : "border-border-1 bg-surface-1 hover:border-accent hover:bg-surface-2 cursor-pointer"
@@ -157,6 +198,17 @@ export default function NewPurchaseOrderPage() {
 
         {loading ? (
           <ParseProgress filename={filename} />
+        ) : usage?.isBlocked ? (
+          <div className="flex flex-col items-center gap-3">
+            <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <p className="text-red-600 font-semibold">Monthly limit reached</p>
+            <p className="text-text-secondary text-sm">You&apos;ve used all 3 free invoices this month.</p>
+            <a href="/billing" className="mt-1 inline-flex items-center gap-1.5 bg-accent hover:bg-accent-dim text-white text-sm font-semibold px-4 py-2 rounded transition-colors">
+              Upgrade to continue
+            </a>
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
             <svg className="w-10 h-10 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

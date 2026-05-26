@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { requireEnv } from "@/lib/requireEnv";
 
 export const PLAN_QUOTAS: Record<string, number> = {
+  free: 3,
   starter: 25,
   growth: 100,
   pro: 250,
@@ -16,6 +17,7 @@ export const PLAN_PRICES: Record<string, number> = {
 };
 
 export const PLAN_NAMES: Record<string, string> = {
+  free: "Free",
   starter: "Starter",
   growth: "Growth",
   pro: "Pro",
@@ -117,4 +119,46 @@ export async function resetPeriodUsage(): Promise<void> {
     invoicesUsedThisPeriod: 0,
     periodResetAt: new Date().toISOString(),
   });
+}
+
+// ── Free tier helpers ──────────────────────────────────────────────────────
+
+const FREE_LIMIT = 3;
+
+function currentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export async function checkAndRecordFreeUsage(
+  merchantId: string
+): Promise<{ allowed: boolean; used: number; limit: number; remaining: number }> {
+  const month = currentMonthKey();
+  const docId = `${merchantId}__${month}`;
+  const ref = adminDb.collection("merchantUsage").doc(docId);
+
+  const snap = await ref.get();
+  const used = snap.exists ? ((snap.data()?.invoiceCount as number) ?? 0) : 0;
+
+  if (used >= FREE_LIMIT) {
+    return { allowed: false, used, limit: FREE_LIMIT, remaining: 0 };
+  }
+
+  // Increment atomically
+  await ref.set(
+    { merchantId, month, invoiceCount: used + 1 },
+    { merge: true }
+  );
+
+  return { allowed: true, used: used + 1, limit: FREE_LIMIT, remaining: FREE_LIMIT - (used + 1) };
+}
+
+export async function getFreeTierUsage(
+  merchantId: string
+): Promise<{ used: number; limit: number; remaining: number }> {
+  const month = currentMonthKey();
+  const docId = `${merchantId}__${month}`;
+  const snap = await adminDb.collection("merchantUsage").doc(docId).get();
+  const used = snap.exists ? ((snap.data()?.invoiceCount as number) ?? 0) : 0;
+  return { used, limit: FREE_LIMIT, remaining: Math.max(0, FREE_LIMIT - used) };
 }

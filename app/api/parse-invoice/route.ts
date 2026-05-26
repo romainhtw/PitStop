@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { v4 as uuidv4 } from "uuid";
 import { waitUntil } from "@vercel/functions";
 import { adminDb } from "@/lib/firebaseAdmin";
-import { recordInvoiceUsage } from "@/lib/stripe/usageTracking";
+import { recordInvoiceUsage, checkAndRecordFreeUsage } from "@/lib/stripe/usageTracking";
 import type { PurchaseOrder } from "@/lib/types";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -37,6 +37,28 @@ export async function POST(req: NextRequest) {
     console.log("[parse-invoice] Request received");
 
     const merchantId = req.headers.get("x-merchant-id") ?? "elite-racing";
+
+    // ── Free tier gate ────────────────────────────────────────────────────────
+    const merchantSnap = await adminDb.collection("merchants").doc(merchantId).get();
+    const merchantPlan: string = merchantSnap.exists
+      ? ((merchantSnap.data()?.plan as string) ?? "free")
+      : "free";
+
+    if (merchantPlan === "free") {
+      const { allowed, used, limit } = await checkAndRecordFreeUsage(merchantId);
+      if (!allowed) {
+        return NextResponse.json(
+          {
+            error: `Free plan limit reached (${limit} invoices/month). Upgrade to continue uploading.`,
+            limitReached: true,
+            used,
+            limit,
+          },
+          { status: 402 }
+        );
+      }
+    }
+    // ── End free tier gate ────────────────────────────────────────────────────
 
     const formData = await req.formData();
     const file = formData.get("file");
@@ -239,19 +261,24 @@ export async function POST(req: NextRequest) {
     await adminDb.collection("purchaseOrders").doc(poId).set(po);
     console.log("[parse-invoice] Saved to Firestore OK");
 
-    // Track usage + Stripe overage in background (non-blocking)
-    waitUntil(
-      recordInvoiceUsage().catch((err) =>
-        console.error("[parse-invoice] Usage tracking failed:", err)
-      )
-    );
+    // Track usage + Stripe overage in background (non-blocking).
+    // Free-tier merchants are already counted in the gate above — skip here.
+    if (merchantPlan !== "free") {
+      waitUntil(
+        recordInvoiceUsage().catch((err) =>
+          console.error("[parse-invoice] Usage tracking failed:", err)
+        )
+      );
+    }
 
     // Upsert supplier in background — use waitUntil so Vercel doesn't freeze before the write completes
     if (parsed.supplier) {
       const supplierName = parsed.supplier as string;
-      const key = supplierName.toLowerCase().trim();
+      const nameKey = supplierName.toLowerCase().trim();
+      // Tenant-scoped doc id — see app/api/suppliers/[name]/route.ts
+      const docId = `${merchantId}__${nameKey}`;
       waitUntil(
-        adminDb.collection("suppliers").doc(key).set(
+        adminDb.collection("suppliers").doc(docId).set(
           { merchantId, name: supplierName, lastSeen: now },
           { merge: true }
         ).catch(() => {})
