@@ -57,6 +57,7 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<ScanOutcome | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const lastCodeRef = useRef<string>("");
   const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
@@ -82,7 +83,28 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
   // Start camera
   useEffect(() => {
     let cancelled = false;
+    setError(null);
+
     async function start() {
+      // First: explicitly request camera via getUserMedia so the browser
+      // permission prompt fires immediately (ZXing sometimes skips it)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        // Stop the test stream — ZXing will open its own
+        stream.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        if (cancelled) return;
+        const name = e instanceof DOMException ? e.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          setError("permission_denied");
+        } else if (name === "NotFoundError") {
+          setError("no_camera");
+        } else {
+          setError("retry");
+        }
+        return;
+      }
+
       try {
         const { BrowserMultiFormatReader, BarcodeFormat } = await import("@zxing/browser");
         const { DecodeHintType } = await import("@zxing/library");
@@ -108,15 +130,20 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
         stopRef.current = () => controls.stop();
       } catch (e) {
         if (cancelled) return;
-        const msg = e instanceof Error ? e.message : "Camera error";
-        setError(msg.toLowerCase().includes("permission")
-          ? "Camera permission denied — allow access and try again."
-          : msg);
+        const name = e instanceof DOMException ? e.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          setError("permission_denied");
+        } else if (name === "NotFoundError") {
+          setError("no_camera");
+        } else {
+          // NotReadableError, OverconstrainedError, etc. — retryable
+          setError("retry");
+        }
       }
     }
     start();
     return () => { cancelled = true; stopRef.current?.(); };
-  }, [handleRaw]);
+  }, [handleRaw, retryKey]);
 
   const borderCls =
     flash === "found"     ? "border-green-400"  :
@@ -154,8 +181,56 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
       {/* Viewfinder */}
       <div className={`relative flex-1 border-4 transition-colors duration-150 ${borderCls}`}>
         {error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-center px-8 gap-3">
-            <p className="text-red-300 text-sm font-medium">{error}</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-center px-8 gap-4">
+            {error === "permission_denied" ? (
+              <>
+                <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                <div>
+                  <p className="text-white font-semibold text-sm mb-1">Camera access blocked</p>
+                  <p className="text-gray-400 text-xs leading-relaxed">
+                    Allow camera access in your browser settings.
+                  </p>
+                </div>
+                <div className="bg-gray-800 rounded-lg px-4 py-3 text-left max-w-xs w-full">
+                  <p className="text-gray-300 text-xs font-semibold mb-1.5">To enable:</p>
+                  <ol className="text-gray-400 text-xs space-y-1 list-decimal list-inside">
+                    <li>Tap the <span className="text-white font-medium">lock icon</span> in the address bar</li>
+                    <li>Select <span className="text-white font-medium">Camera → Allow</span></li>
+                    <li>Come back and tap Retry</li>
+                  </ol>
+                </div>
+                <button
+                  onClick={() => setRetryKey((k) => k + 1)}
+                  className="mt-1 px-5 py-2 bg-accent text-white text-sm font-semibold rounded-lg"
+                >
+                  Retry
+                </button>
+              </>
+            ) : error === "no_camera" ? (
+              <>
+                <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                <p className="text-white font-semibold text-sm">No camera found</p>
+                <p className="text-gray-400 text-xs">Use a device with a camera to scan barcodes.</p>
+              </>
+            ) : (
+              <>
+                <svg className="w-10 h-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                <p className="text-white font-semibold text-sm">Camera couldn&apos;t start</p>
+                <p className="text-gray-400 text-xs">The camera may be in use by another app.</p>
+                <button
+                  onClick={() => setRetryKey((k) => k + 1)}
+                  className="mt-1 px-5 py-2 bg-accent text-white text-sm font-semibold rounded-lg"
+                >
+                  Try again
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <>
