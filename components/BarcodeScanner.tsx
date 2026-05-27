@@ -80,13 +80,32 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
     return () => clearTimeout(t);
   }, [scanResult]);
 
-  // Start camera — go straight to ZXing, no pre-check
+  // Start camera — getUserMedia owns the stream, ZXing only decodes
   useEffect(() => {
     let cancelled = false;
+    let stream: MediaStream | null = null;
     setError(null);
 
     async function start() {
       try {
+        // Open camera ourselves — facingMode:environment = rear camera on mobile
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width:  { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        if (!videoRef.current) return;
+
+        // Attach stream directly to <video>
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+
+        // ZXing decodes from the stream (no camera management by ZXing)
         const { BrowserMultiFormatReader, BarcodeFormat } = await import("@zxing/browser");
         const { DecodeHintType } = await import("@zxing/library");
         const hints = new Map();
@@ -104,30 +123,19 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
           delayBetweenScanSuccess: 1600,
         });
 
-        // Pick the best camera: rear on mobile, skip virtual/OBS on desktop
-        const { BrowserCodeReader } = await import("@zxing/browser");
-        const devices = await BrowserCodeReader.listVideoInputDevices();
-        let deviceId: string | undefined;
-        if (devices.length > 0) {
-          const label = (d: MediaDeviceInfo) => d.label.toLowerCase();
-          const rear = devices.find(d =>
-            label(d).includes("back") || label(d).includes("rear") || label(d).includes("environment")
-          );
-          const notVirtual = devices.find(d =>
-            !label(d).includes("virtual") && !label(d).includes("obs") &&
-            !label(d).includes("snap") && !label(d).includes("droid")
-          );
-          deviceId = (rear ?? notVirtual ?? devices[0]).deviceId;
-        }
-
         if (!videoRef.current || cancelled) return;
-        const controls = await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result) => {
+        const controls = await reader.decodeFromStream(stream, videoRef.current, (result) => {
           if (cancelled || !result) return;
           handleRaw(result.getText());
         });
-        stopRef.current = () => controls.stop();
+
+        stopRef.current = () => {
+          controls.stop();
+          stream?.getTracks().forEach(t => t.stop());
+        };
       } catch (e) {
         if (cancelled) return;
+        stream?.getTracks().forEach(t => t.stop());
         const name = e instanceof DOMException ? e.name : "";
         if (name === "NotAllowedError" || name === "PermissionDeniedError") {
           setError("permission_denied");
@@ -136,8 +144,13 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
         }
       }
     }
+
     start();
-    return () => { cancelled = true; stopRef.current?.(); };
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach(t => t.stop());
+      stopRef.current?.();
+    };
   }, [handleRaw, retryKey]);
 
   const borderCls =
