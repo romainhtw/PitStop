@@ -103,8 +103,25 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
           delayBetweenScanAttempts: 80,
           delayBetweenScanSuccess: 1600,
         });
+
+        // Pick the best camera: rear on mobile, skip virtual/OBS on desktop
+        const { BrowserCodeReader } = await import("@zxing/browser");
+        const devices = await BrowserCodeReader.listVideoInputDevices();
+        let deviceId: string | undefined;
+        if (devices.length > 0) {
+          const label = (d: MediaDeviceInfo) => d.label.toLowerCase();
+          const rear = devices.find(d =>
+            label(d).includes("back") || label(d).includes("rear") || label(d).includes("environment")
+          );
+          const notVirtual = devices.find(d =>
+            !label(d).includes("virtual") && !label(d).includes("obs") &&
+            !label(d).includes("snap") && !label(d).includes("droid")
+          );
+          deviceId = (rear ?? notVirtual ?? devices[0]).deviceId;
+        }
+
         if (!videoRef.current || cancelled) return;
-        const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
+        const controls = await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result) => {
           if (cancelled || !result) return;
           handleRaw(result.getText());
         });
