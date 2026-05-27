@@ -80,31 +80,12 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
     return () => clearTimeout(t);
   }, [scanResult]);
 
-  // Start camera
+  // Start camera — go straight to ZXing, no pre-check
   useEffect(() => {
     let cancelled = false;
     setError(null);
 
     async function start() {
-      // First: explicitly request camera via getUserMedia so the browser
-      // permission prompt fires immediately (ZXing sometimes skips it)
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        // Stop the test stream — ZXing will open its own
-        stream.getTracks().forEach((t) => t.stop());
-      } catch (e) {
-        if (cancelled) return;
-        const name = e instanceof DOMException ? e.name : "";
-        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-          setError("permission_denied");
-        } else if (name === "NotFoundError") {
-          setError("no_camera");
-        } else {
-          setError("retry");
-        }
-        return;
-      }
-
       try {
         const { BrowserMultiFormatReader, BarcodeFormat } = await import("@zxing/browser");
         const { DecodeHintType } = await import("@zxing/library");
@@ -133,10 +114,7 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
         const name = e instanceof DOMException ? e.name : "";
         if (name === "NotAllowedError" || name === "PermissionDeniedError") {
           setError("permission_denied");
-        } else if (name === "NotFoundError") {
-          setError("no_camera");
         } else {
-          // NotReadableError, OverconstrainedError, etc. — retryable
           setError("retry");
         }
       }
@@ -207,14 +185,6 @@ export default function BarcodeScanner({ onDetected, onClose, scanResult, totalC
                 >
                   Retry
                 </button>
-              </>
-            ) : error === "no_camera" ? (
-              <>
-                <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-                </svg>
-                <p className="text-white font-semibold text-sm">No camera found</p>
-                <p className="text-gray-400 text-xs">Use a device with a camera to scan barcodes.</p>
               </>
             ) : (
               <>
